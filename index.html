@@ -255,6 +255,31 @@ function semilla(){
     movimientos:[], pagos:[], ingresos:[], fijos:[], presupuestos:[], metas:[]
   };
 }
+var VERSION = 5;
+/* Rellena lo que falte: así un caché viejo o una planilla sin las hojas nuevas
+   no rompen la app. */
+function sanear(d){
+  var base = semilla();
+  if(!d || typeof d!=="object") return base;
+  d.config = d.config && typeof d.config==="object" ? d.config : {};
+  for(var k in base.config){
+    if(!Object.prototype.hasOwnProperty.call(d.config,k) || d.config[k]===undefined ||
+       d.config[k]===null) d.config[k]=base.config[k];
+  }
+  ["categorias","medios","movimientos","pagos","ingresos","fijos","presupuestos","metas"]
+    .forEach(function(k){ if(!Array.isArray(d[k])) d[k]=[]; });
+  if(!d.categorias.length) d.categorias = base.categorias;
+  if(!d.medios.length) d.medios = base.medios;
+  d.medios = d.medios.map(function(m){
+    return {id:m.id||("e"+(m.fila||0)), fila:m.fila||0, nombre:m.nombre||"Efectivo",
+            tipo: m.tipo==="credito"?"credito":"efectivo",
+            cierre:+m.cierre||0, vence:+m.vence||0, mant:+m.mant||0,
+            mantDesde: mesTxt(m.mantDesde)};
+  });
+  d.v = VERSION;
+  return d;
+}
+
 var S = semilla();
 var mesHoy = mk(new Date());
 var vista = "panel";
@@ -517,6 +542,14 @@ function flush(){
     if(r && r.error==="auth"){ saveState="offline"; pintarSave(); toast("El PIN ya no coincide"); salir(); return; }
     if(r && r.error==="sin_espacio"){ cola.shift(); cache(); saveState="pendiente"; pintarSave();
       toast("No quedan filas libres en el Sheet"); return; }
+    /* Error definitivo del script (hoja o columna que no existe, acción vieja...):
+       lo descartamos para que no trabe todo lo que viene atrás. */
+    if(r && r.ok===false){
+      cola.shift(); cache();
+      toast("Un cambio no se pudo guardar en el Sheet ("+(r.error||"error")+")");
+      if(cola.length) flush(); else { saveState="ok"; pintarSave(); }
+      return;
+    }
     saveState="pendiente"; pintarSave();
   }, function(){ enviando=false; saveState="pendiente"; pintarSave(); });
 }
@@ -594,7 +627,7 @@ function desdeSheet(d){
             pago: String(v[5]).indexOf("Auto")===0 ? "Automático" : "Manual",
             dia:+v[6]||0};
   }).filter(function(x){ return x.monto>0; });
-  return s;
+  return sanear(s);
 }
 function recargar(silencioso){
   if(!sesion.pin || !sesion.url) return Promise.resolve(false);
@@ -650,17 +683,36 @@ function pintarNav(){
       '<svg viewBox="0 0 24 24"><path d="'+n.d+'"/></svg><span>'+n.lbl+'</span></button>';
   }).join("");
 }
-function render(){
-  var h=document.getElementById("hdr-mes");
-  if(h) h.textContent=mesLargo(mesHoy);
-  pintarNav(); pintarSave();
-  if(vista==="panel") vPanel();
-  else if(vista==="cargar") vCargar();
+function pintarVista(){
+  if(vista==="cargar") vCargar();
   else if(vista==="deudas") vDeudas();
   else if(vista==="agenda") vAgenda();
   else if(vista==="meses") vMeses();
   else if(vista==="lista") vLista();
   else if(vista==="ajustes") vAjustes();
+  else vPanel();
+}
+function render(){
+  var h=document.getElementById("hdr-mes");
+  if(h) h.textContent=mesLargo(mesHoy);
+  try{ pintarNav(); pintarSave(); }catch(e){}
+  try{
+    S = sanear(S);
+    pintarVista();
+  }catch(err){
+    if(window.console && console.error) console.error(err);
+    app.innerHTML='<section class="card alerta">'+
+      '<div class="eyebrow warnc">No pude dibujar esta pantalla</div>'+
+      '<div class="sub" style="margin-top:6px">Casi siempre se arregla trayendo los datos de nuevo desde el Sheet.</div>'+
+      '<div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap">'+
+        '<button class="btn ghost mini" data-act="sync">Actualizar desde el Sheet</button>'+
+        '<button class="btn ghost mini" data-act="reset-cache">Borrar la copia local</button>'+
+        '<button class="btn ghost mini" data-nav="panel">Ir al Panel</button>'+
+      '</div>'+
+      '<details style="margin-top:10px"><summary>Detalle técnico</summary>'+
+        '<div class="note" style="margin-top:6px">'+esc(String((err&&err.message)||err))+'</div></details>'+
+    '</section>';
+  }
 }
 
 function filaPago(o, hecho){
@@ -1237,7 +1289,7 @@ function vAgenda(){
           '<div class="sub">'+[
             e.dia? "día "+e.dia : "",
             e.detalle? esc(e.detalle) : "",
-            f? "queda "+money(f.saldo) : ""
+            f? '<span'+(f.saldo<0?' class="neg" style="font-weight:600"':'')+'>queda '+money(f.saldo)+'</span>' : ""
           ].filter(function(x){ return x; }).join(" · ")+'</div></div>'+
         '<div class="num'+(esIng?" pos":"")+'">'+(esIng?"+":"")+money(e.monto)+'</div>'+
       '</div>';
@@ -1709,6 +1761,11 @@ document.addEventListener("click", function(e){
       cache(); vAjustes();
     }
     else if(a==="sync") recargar(false);
+    else if(a==="reset-cache"){
+      try{ localStorage.removeItem("cc_datos"); localStorage.removeItem("cc_cola"); }catch(e){}
+      cola=[]; S=semilla(); vista="panel"; render();
+      toast("Copia local borrada"); recargar(false);
+    }
     else if(a==="salir") salir();
     else if(a==="csv-mov") bajar("movimientos.csv", csvMov());
     else if(a==="csv-proy") bajar("proyeccion.csv", csvProy());
@@ -1765,7 +1822,7 @@ function vGate(error){
   document.getElementById("g-pin").addEventListener("keydown", function(e){ if(e.key==="Enter") entrar(); });
   var off=document.getElementById("g-off");
   if(off) off.addEventListener("click", function(){
-    try{ S=JSON.parse(localStorage.getItem("cc_datos"))||semilla(); }catch(e){ S=semilla(); }
+    try{ S=sanear(JSON.parse(localStorage.getItem("cc_datos"))); }catch(e){ S=semilla(); }
     saveState="offline"; mostrarApp(); render();
   });
 }
@@ -1774,7 +1831,7 @@ function boot(){
     sesion.url = CC_URL || localStorage.getItem("cc_url") || "";
     sesion.pin = localStorage.getItem("cc_pin") || "";
     var raw=localStorage.getItem("cc_datos");
-    if(raw){ var d=JSON.parse(raw); if(d && d.categorias) S=d; }
+    if(raw){ var d=JSON.parse(raw); if(d && d.categorias) S=sanear(d); }
     var c=localStorage.getItem("cc_cola");
     if(c) cola=JSON.parse(c)||[];
   }catch(e){}
