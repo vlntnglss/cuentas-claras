@@ -181,7 +181,7 @@ details[open] summary::before{content:"– ";}
    (termina en /exec). Si la dejás vacía, la app te la pide la
    primera vez y la guarda en el teléfono.
    ============================================================= */
-var CC_URL = "https://script.google.com/macros/s/AKfycbwFLzuWW_LSuZdFXRR0dWQdGInMCmdQ6OLIe_hqXdXoX9XGgD0bUprvqXo0__vl9WkzxA/exec";
+var CC_URL = "https://script.google.com/macros/s/AKfycbwNFZogs1561ks08vjfWRVIw65JmAIxaKrBxOggS8qyoZusRqoKiw-pLrm3bFHewSOJ/exec";
 </script>
 </head>
 <body>
@@ -274,7 +274,9 @@ function sanear(d){
     return {id:m.id||("e"+(m.fila||0)), fila:m.fila||0, nombre:m.nombre||"Efectivo",
             tipo: m.tipo==="credito"?"credito":"efectivo",
             cierre:+m.cierre||0, vence:+m.vence||0, mant:+m.mant||0,
-            mantDesde: mesTxt(m.mantDesde)};
+            mantDesde: mesTxt(m.mantDesde),
+            prioridad: m.prioridad || (m.tipo==="credito"?"Alta":"Media"),
+            quita: (m.quita===undefined||m.quita===null||m.quita==="") ? 1 : +m.quita};
   });
   d.v = VERSION;
   return d;
@@ -295,6 +297,10 @@ function medio(nombre){
   return {nombre:nombre, tipo:"efectivo", cierre:0};
 }
 function esCredito(mv){ return medio(mv.medio).tipo==="credito"; }
+function claseDe(m){
+  if(m.tipo!=="credito") return "efectivo";
+  return +m.cierre>0 ? "tarjeta" : "prestamo";
+}
 function cuotaDe(mv){ return mv.monto / Math.max(1, mv.cuotas||1); }
 function primerMes(mv){
   if(mesTxt(mv.primera)) return mesTxt(mv.primera);
@@ -310,14 +316,24 @@ function primerMes(mv){
   return addM(mes, salto);
 }
 function esPlan(mv){ return mv.estado==="Planificado"; }
+function esPend(mv){ return mv.estado==="Pendiente"; }
+var ORDEN_PRI = {Alta:0, Media:1, Baja:2};
+function prioridadDe(x){ var p=String(x||"Media"); return ORDEN_PRI[p]===undefined ? 1 : ORDEN_PRI[p]; }
 function cuentaEn(mv){ return !esPlan(mv) || S.config.verPlan!==false; }
 function ultimoMes(mv){ return addM(primerMes(mv), Math.max(1,mv.cuotas||1)-1); }
 function activoEn(mv,mes){ var p=primerMes(mv); return mes>=p && mes<=ultimoMes(mv); }
 
+function cuotasDeMedio(m, mes){
+  return S.movimientos.reduce(function(a,mv){
+    return a + (mv.medio===m.nombre && esCredito(mv) && !esPlan(mv) && activoEn(mv,mes)
+                ? cuotaDe(mv) : 0); },0);
+}
+/* El mantenimiento solo se cobra si la tarjeta tiene cuotas ese mes. */
 function mantenimientoDe(m, mes){
   if(m.tipo!=="credito" || !(+m.mant>0)) return 0;
   var desde = m.mantDesde || mesHoy;
-  return mes>=desde ? +m.mant : 0;
+  if(mes<desde) return 0;
+  return cuotasDeMedio(m,mes)>0 ? +m.mant : 0;
 }
 function mantenimientoMes(mes){
   return S.medios.reduce(function(a,m){ return a+mantenimientoDe(m,mes); },0);
@@ -332,17 +348,25 @@ function pagoDe(clave, mes){
 }
 function pagado(clave, mes){ return !!pagoDe(clave, mes); }
 
+function claveMov(mv){ return "MOV:"+mv.fila; }
 function cuotasPagadas(mv){
   if(esPlan(mv)) return 0;
+  var m, fin, cl, n=0;
+  if(esPend(mv)){
+    m=primerMes(mv); fin=ultimoMes(mv); cl=claveMov(mv);
+    while(m<=fin){ if(pagado(cl,m)) n++; m=addM(m,1); }
+    return n;
+  }
   if(!esCredito(mv)) return mv.cuotas||1;
-  var n=0, m=primerMes(mv), fin=ultimoMes(mv), cl=claveMedio(mv.medio);
+  m=primerMes(mv); fin=ultimoMes(mv); cl=claveMedio(mv.medio);
   while(m<=fin){ if(pagado(cl,m)) n++; m=addM(m,1); }
   return n;
 }
 function atrasadasDe(mv){
-  if(!esCredito(mv) || esPlan(mv)) return 0;
+  if(esPlan(mv)) return 0;
+  if(!esCredito(mv) && !esPend(mv)) return 0;
   var venc = Math.min(mv.cuotas, Math.max(0, diffM(mesHoy, primerMes(mv))));
-  var pag=0, m=primerMes(mv), cl=claveMedio(mv.medio);
+  var pag=0, m=primerMes(mv), cl=esPend(mv)? claveMov(mv) : claveMedio(mv.medio);
   for(var i=0;i<venc;i++){ if(pagado(cl,m)) pag++; m=addM(m,1); }
   return Math.max(0, venc-pag);
 }
@@ -352,7 +376,11 @@ function movCalc(mv){
   var pend = Math.max(0, (mv.cuotas||1) - pagadas);
   var nominal = pend*c;
   var tasa = (mv.contado>0 && (mv.cuotas||1)>1) ? tasaImplicita(mv.contado, c, mv.cuotas) : 0;
-  var cancelar = tasa>0 ? PV(tasa, pend, c) : nominal;
+  var quita = medio(mv.medio).quita;
+  if(quita===undefined || quita===null) quita = 1;
+  var vp = tasa>0 ? PV(tasa, pend, c) : nominal;
+  /* si la entidad no perdona el 100% de los intereses, cancelar cuesta más */
+  var cancelar = vp + (1-quita)*(nominal-vp);
   var seguir = PV(S.config.tasaRef, pend, c);
   return {cuota:c, pagadas:pagadas, pend:pend, nominal:nominal, tasa:tasa,
           cancelar:cancelar, seguir:seguir, ahorro:seguir-cancelar,
@@ -415,13 +443,22 @@ function obligaciones(mes){
       var det = n? n+(n===1?" cuota":" cuotas") : "";
       if(mant>0) det += (det?" + ":"")+"mantenimiento "+money(mant);
       out.push({clave:claveMedio(m.nombre), concepto:m.nombre, detalle:det,
-        monto:tot, mes:mes, tipo:"credito", dia:+m.vence||0});
+        monto:tot, mes:mes, tipo:"credito", dia:+m.vence||0,
+        prioridad:m.prioridad||"Alta"});
     }
   });
   S.fijos.forEach(function(f){
     if(f.pago==="Automático" || !vigente(f,mes) || !f.fila) return;
     out.push({clave:claveFijo(f), concepto:f.concepto,
-      detalle:f.categoria, monto:+f.monto||0, mes:mes, tipo:"fijo", dia:f.dia||0});
+      detalle:f.categoria, monto:+f.monto||0, mes:mes, tipo:"fijo", dia:f.dia||0,
+      prioridad:f.prioridad||"Media"});
+  });
+  S.movimientos.forEach(function(mv){
+    if(!esPend(mv) || !activoEn(mv,mes) || !mv.fila) return;
+    var md=medio(mv.medio);
+    out.push({clave:claveMov(mv), concepto:mv.detalle, detalle:mv.categoria+" · lo debo",
+      monto:cuotaDe(mv), mes:mes, tipo:"pendiente", dia:0,
+      prioridad:md.prioridad||"Media"});
   });
   var dm=mesData(mes,false);
   S.metas.forEach(function(g){
@@ -430,7 +467,7 @@ function obligaciones(mes){
     if(ap<=0.5) return;
     out.push({clave:"META:"+g.fila, concepto:"Apartar para "+g.nombre,
       detalle:(g.tipo==="fijo"?"monto fijo":g.tipo==="pctIngreso"?pct(g.valor)+" del ingreso":pct(g.valor)+" del sobrante"),
-      monto:ap, mes:mes, tipo:"meta", dia:g.dia||1});
+      monto:ap, mes:mes, tipo:"meta", dia:g.dia||1, prioridad:"Baja"});
   });
   return out;
 }
@@ -488,7 +525,8 @@ function porCategoria(mes){
 }
 function deudaTotal(){
   return S.movimientos.reduce(function(a,mv){
-    return a + (esCredito(mv)&&!esPlan(mv)? movCalc(mv).nominal : 0); },0);
+    if(esPlan(mv)) return a;
+    return a + ((esCredito(mv)||esPend(mv))? movCalc(mv).nominal : 0); },0);
 }
 
 /* ========================================================= persistencia */
@@ -579,9 +617,11 @@ function desdeSheet(d){
   s.medios = (d.medios||[]).map(function(m){
     return {id:"e"+m.fila, fila:m.fila, nombre:m.nombre,
             tipo: m.tipo==="credito"?"credito":"efectivo", cierre:+m.cierre||0,
-            vence:+m.vence||0, mant:+m.mant||0, mantDesde: mesTxt(m.mantDesde)}; });
+            vence:+m.vence||0, mant:+m.mant||0, mantDesde: mesTxt(m.mantDesde),
+            prioridad: m.prioridad || (m.tipo==="credito"?"Alta":"Media"),
+            quita: (m.quita===undefined||m.quita===null||m.quita==="") ? 1 : +m.quita}; });
   if(!s.medios.length) s.medios=[{id:"e0", fila:0, nombre:"Efectivo", tipo:"efectivo", cierre:0,
-            vence:0, mant:0, mantDesde:null}];
+            vence:0, mant:0, mantDesde:null, prioridad:"Media", quita:1}];
   s.movimientos = (d.Movimientos||[]).map(function(r){
     var v=r.vals;
     var o={id:"m"+r.fila, fila:r.fila, fecha:String(v[0]).slice(0,10),
@@ -590,6 +630,7 @@ function desdeSheet(d){
     if(+v[6]>0) o.contado=+v[6];
     if(mesTxt(v[7])) o.primera=mesTxt(v[7]);
     if(String(v[8]).indexOf("Plan")===0) o.estado="Planificado";
+    else if(String(v[8]).indexOf("Pend")===0) o.estado="Pendiente";
     return o;
   }).filter(function(m){ return m.monto>0 && /^\d{4}-\d{2}-\d{2}$/.test(m.fecha); });
   s.pagos = (d.Pagos||[]).map(function(r){
@@ -625,7 +666,7 @@ function desdeSheet(d){
     return {id:"f"+r.fila, fila:r.fila, concepto:v[0]||"", categoria:v[1]||"Otros",
             monto:+v[2]||0, desde:mesTxt(v[3]), hasta:mesTxt(v[4]),
             pago: String(v[5]).indexOf("Auto")===0 ? "Automático" : "Manual",
-            dia:+v[6]||0};
+            dia:+v[6]||0, prioridad: String(v[7]||"") || "Media"};
   }).filter(function(x){ return x.monto>0; });
   return sanear(s);
 }
@@ -814,10 +855,18 @@ function vPanel(){
       '<div class="eyebrow">Gastos planificados</div>'+
       '<div class="big">'+money(totPlan)+'</div>'+
       '<div class="sub">Todavía no los gastaste: son simulación.</div>'+
+      (planes.some(function(m){
+         var i2=diffM(primerMes(m), mesHoy);
+         return i2>=0 && i2<proy24.length && proy24[i2].saldo<0; })
+        ? '<div class="note hint" style="margin-top:8px">Ojo: hay planificados que caen en meses donde el saldo ya te da negativo. '+
+          'Si los hacés igual, el rojo se hace más grande; conviene moverlos a un mes con aire.</div>' : '')+
       '<div style="margin-top:8px">'+planes.sort(function(a,b){
         return primerMes(a)<primerMes(b)?-1:1; }).map(function(m){
         var c=movCalc(m);
-        return '<div class="rowline"><div><div style="font-weight:600">'+esc(m.detalle)+'</div>'+
+        var idxP=diffM(c.primera, mesHoy);
+        var rojoP = idxP>=0 && idxP<proy24.length && proy24[idxP].saldo<0;
+        return '<div class="rowline"><div><div style="font-weight:600">'+esc(m.detalle)+
+          (rojoP? ' <span class="pill bad">mes en rojo</span>':'')+'</div>'+
           '<div class="sub">'+esc(mesLbl(c.primera,true))+(m.cuotas>1? ' · '+m.cuotas+' cuotas de '+money(c.cuota):'')+' · '+esc(m.medio)+'</div>'+
           '<div style="margin-top:4px; display:flex; gap:6px">'+
             '<button class="btn ghost mini" data-confirmar="'+m.id+'" style="padding:3px 8px; font-size:11px">Ya lo gasté</button>'+
@@ -911,8 +960,8 @@ var draft=null;
 function nuevoDraft(){
   var cat = S.categorias.length? S.categorias[0].nombre : "Otros";
   var med = S.medios.length? S.medios[0].nombre : "Efectivo";
-  return {fecha:hoyISO(), monto:"", modo:"total", detalle:"", categoria:cat,
-          medio:med, cuotas:1, contado:"", primera:"", plan:false, planMes:addM(mesHoy,1)};
+  return {fecha:hoyISO(), monto:"", detalle:"", categoria:cat, verPrestamos:false,
+          medio:med, cuotas:1, contado:"", primera:"", carga:"gaste", planMes:addM(mesHoy,1)};
 }
 function vCargar(){
   if(!draft) draft=nuevoDraft();
@@ -924,26 +973,33 @@ function vCargar(){
       'Lo que cambia es el medio de pago.</div>'+
 
     '<div class="field" style="margin-top:12px"><div class="chips" id="c-plan">'+
-      '<button class="chip" type="button" data-plan="0" aria-pressed="'+(!draft.plan)+'">Ya lo gasté</button>'+
-      '<button class="chip" type="button" data-plan="1" aria-pressed="'+(!!draft.plan)+'">Lo estoy planificando</button>'+
-    '</div></div>'+
+      '<button class="chip" type="button" data-plan="gaste" aria-pressed="'+(draft.carga==="gaste")+'">Lo gasté</button>'+
+      '<button class="chip" type="button" data-plan="debo" aria-pressed="'+(draft.carga==="debo")+'">Lo debo</button>'+
+      '<button class="chip" type="button" data-plan="plan" aria-pressed="'+(draft.carga==="plan")+'">Lo estoy planificando</button>'+
+    '</div>'+
+    '<div class="note">'+(draft.carga==="gaste"
+      ? 'Ya salió de tu bolsillo o entró al resumen de la tarjeta.'
+      : draft.carga==="debo"
+      ? 'Lo compraste o te venció, pero todavía no lo pagaste. Va a aparecer para tildar y, si el mes pasa, queda como atrasado.'
+      : 'Todavía no lo gastaste. Entra en la proyección como simulación, sin contar como deuda.')+'</div></div>'+
 
-    '<div class="field" style="margin-top:12px"><div class="chips" id="c-modo">'+
-      '<button class="chip" type="button" data-modo="total" aria-pressed="'+(draft.modo==="total")+'">Monto total</button>'+
-      '<button class="chip" type="button" data-modo="cuota" aria-pressed="'+(draft.modo==="cuota")+'">Valor de la cuota</button>'+
-    '</div></div>'+
-
-    '<div class="field montoin"><label for="f-monto">'+
-      (draft.modo==="cuota"?"Cuánto pagás por mes":"Monto total")+'</label>'+
+    '<div class="field montoin"><label for="f-monto">Monto total</label>'+
       '<input id="f-monto" type="number" inputmode="decimal" placeholder="0" value="'+esc(draft.monto)+'"></div>'+
 
     '<div class="field"><label for="f-det">Detalle</label>'+
       '<input id="f-det" type="text" placeholder="Ej: heladera, nafta, crédito auto" value="'+esc(draft.detalle)+'"></div>'+
 
     '<div class="field"><label>Medio de pago</label><div class="chips" id="c-med">'+
-      S.medios.map(function(m){
+      S.medios.filter(function(m){ return claseDe(m)!=="prestamo"; }).map(function(m){
         return '<button class="chip" type="button" data-med="'+esc(m.nombre)+'" aria-pressed="'+(draft.medio===m.nombre)+'">'+
-          esc(m.nombre)+'<small>'+(m.tipo==="credito"?"crédito":"efectivo")+'</small></button>'; }).join("")+
+          esc(m.nombre)+'<small>'+(claseDe(m)==="tarjeta"?"tarjeta":"efectivo")+'</small></button>'; }).join("")+
+      (S.medios.some(function(m){ return claseDe(m)==="prestamo"; })
+        ? (draft.verPrestamos
+            ? S.medios.filter(function(m){ return claseDe(m)==="prestamo"; }).map(function(m){
+                return '<button class="chip" type="button" data-med="'+esc(m.nombre)+'" aria-pressed="'+(draft.medio===m.nombre)+'">'+
+                  esc(m.nombre)+'<small>préstamo</small></button>'; }).join("")
+            : '<button class="chip" type="button" data-act="ver-prestamos">+ préstamos</button>')
+        : '')+
       '</div>'+
       '<div class="note">'+(cred
         ? 'Crédito: se reparte en cuotas y suma a tu deuda futura.'
@@ -970,11 +1026,15 @@ function vCargar(){
         return '<button class="chip" type="button" data-cat="'+esc(c.nombre)+'" aria-pressed="'+(draft.categoria===c.nombre)+'">'+esc(c.nombre)+'</button>'; }).join("")+
       '</div></div>'+
 
-    (draft.plan
+    (draft.carga==="plan"
       ? '<div class="field"><label for="f-planmes">¿En qué mes lo vas a pagar?</label>'+
-          '<input id="f-planmes" type="month" value="'+esc(draft.planMes)+'">'+
-          '<div class="note">Va a entrar en la proyección de ese mes como simulación, sin contarse como deuda ni pedirte que lo marques.</div></div>'
+          '<input id="f-planmes" type="month" value="'+esc(draft.planMes)+'"></div>'
       : '<div class="field"><label for="f-fecha">Fecha</label><input id="f-fecha" type="date" value="'+esc(draft.fecha)+'"></div>')+
+    (draft.carga==="debo"
+      ? '<div class="field"><label for="f-planmes">¿En qué mes lo tenés que pagar?</label>'+
+          '<input id="f-planmes" type="month" value="'+esc(draft.planMes)+'">'+
+          '<div class="note">Si ese mes ya pasó, aparece directamente como atrasado.</div></div>'
+      : '')+
 
     '<details style="margin-bottom:12px" id="det-avz"><summary>Opciones para créditos</summary>'+
       '<div class="field" style="margin-top:8px"><label for="f-contado">¿Cuánto salía al contado?</label>'+
@@ -1016,8 +1076,7 @@ function hookCargar(){
       cb(b.getAttribute(attr));
     });
   }
-  chips("c-modo","data-modo", function(v){ draft.modo=v; vCargar(); });
-  chips("c-plan","data-plan", function(v){ draft.plan = v==="1"; vCargar(); });
+  chips("c-plan","data-plan", function(v){ draft.carga=v; vCargar(); });
   chips("c-cat","data-cat", function(v){ draft.categoria=v; });
   chips("c-med","data-med", function(v){ draft.medio=v; vCargar(); });
   chips("c-cuo","data-cuo", function(v){
@@ -1026,19 +1085,20 @@ function hookCargar(){
 }
 function draftTotales(){
   var n = medio(draft.medio).tipo==="credito" ? Math.max(1,+draft.cuotas||1) : 1;
-  var v = +draft.monto||0;
-  var total = draft.modo==="cuota" ? v*n : v;
+  var total = +draft.monto||0;
   return {n:n, total:total, cuota: total/n};
 }
 function pintarPreview(){
   var p=document.getElementById("preview"); if(!p) return;
   var t=draftTotales();
   if(!t.total){ p.textContent="Cargá el monto y te muestro cómo impacta en los próximos meses."; return; }
-  var mv = draft.plan
+  var mv = (draft.carga==="plan")
     ? {fecha:draft.planMes+"-01", medio:draft.medio, monto:t.total, cuotas:t.n, primera:draft.planMes}
+    : (draft.carga==="debo")
+    ? {fecha:draft.fecha, medio:draft.medio, monto:t.total, cuotas:t.n, primera:draft.planMes}
     : {fecha:draft.fecha, medio:draft.medio, monto:t.total, cuotas:t.n, primera:draft.primera};
   var pm=primerMes(mv), um=ultimoMes(mv);
-  var txt = (draft.plan? "<em>Planificado.</em> " : "")+(t.n>1
+  var txt = (draft.carga==="plan"? "<em>Planificado.</em> " : draft.carga==="debo"? "<em>Lo debo.</em> " : "")+(t.n>1
     ? "<strong>"+t.n+" cuotas de "+money(t.cuota)+"</strong> (total "+money(t.total)+"), de "+mesLbl(pm)+" a "+mesLbl(um)+"."
     : "<strong>"+money(t.total)+"</strong> impacta en "+mesLbl(pm)+".");
   var ct=+draft.contado||0;
@@ -1071,9 +1131,11 @@ function guardarMovimiento(){
     categoria:draft.categoria, medio:draft.medio, monto:t.total, cuotas:t.n};
   if(+draft.contado>0) mv.contado=+draft.contado;
   if(mesTxt(draft.primera)) mv.primera=mesTxt(draft.primera);
-  if(draft.plan){
+  if(draft.carga==="plan"){
     var pm=mesTxt(draft.planMes)||addM(mesHoy,1);
     mv.fecha=pm+"-01"; mv.primera=pm; mv.estado="Planificado";
+  } else if(draft.carga==="debo"){
+    mv.primera=mesTxt(draft.planMes)||mesHoy; mv.estado="Pendiente";
   }
   S.movimientos.push(mv);
   op({action:"add", hoja:"Movimientos", cid:mv.id,
@@ -1082,7 +1144,8 @@ function guardarMovimiento(){
   cache();
   var eraPlan = mv.estado==="Planificado";
   draft=nuevoDraft();
-  toast(eraPlan? "Planificado para "+mesLbl(mv.primera,true) : "Guardado: "+money(t.total));
+  toast(eraPlan? "Planificado para "+mesLbl(mv.primera,true)
+      : mv.estado==="Pendiente"? "Anotado como deuda" : "Guardado: "+money(t.total));
   setVista(eraPlan ? "meses" : "panel");
 }
 
@@ -1091,10 +1154,11 @@ var filtroDeuda="todo";
 function vDeudas(){
   var items=[];
   S.movimientos.forEach(function(mv){
-    if(!esCredito(mv) || esPlan(mv)) return;
+    if(esPlan(mv) || (!esCredito(mv) && !esPend(mv))) return;
     var c=movCalc(mv);
     if(c.pend<=0) return;
-    items.push({id:mv.id, nombre:mv.detalle, sub:mv.medio+" · "+mv.categoria, c:c,
+    items.push({id:mv.id, nombre:mv.detalle,
+                sub:(esPend(mv)? "Vencido · " : "")+mv.medio+" · "+mv.categoria, c:c,
                 tasaConocida: !!(mv.contado>0 && mv.cuotas>1)});
   });
   items.sort(function(a,b){ return b.c.porPeso-a.c.porPeso || b.c.nominal-a.c.nominal; });
@@ -1158,8 +1222,10 @@ function vDeudas(){
         '<div><h3 style="font-size:16px">'+esc(i.nombre)+'</h3><div class="sub">'+esc(i.sub)+'</div></div>'+
         '<div style="text-align:right"><div class="mid">'+money(c.nominal)+'</div><div class="sub">falta pagar</div></div>'+
       '</div>'+
-      (c.atrasadas>0? '<div style="margin-top:8px"><span class="pill bad">⚠ '+c.atrasadas+
-        (c.atrasadas===1?' cuota atrasada':' cuotas atrasadas')+' · '+money(c.atrasadas*c.cuota)+'</span></div>':'')+
+      '<div style="margin-top:8px">'+(c.atrasadas>0
+        ? '<span class="pill bad">⚠ '+c.atrasadas+(c.atrasadas===1?' cuota atrasada':' cuotas atrasadas')+
+          ' · '+money(c.atrasadas*c.cuota)+'</span>'
+        : '<span class="pill good">✓ Al día</span>')+'</div>'+
       '<div class="rowline" style="margin-top:8px"><span>Cuota</span><span class="num">'+money(c.cuota)+' × '+c.pend+' (hasta '+mesLbl(c.ultima)+')</span></div>'+
       '<div class="rowline"><span>Pagadas</span><span class="num">'+c.pagadas+' de '+(c.pagadas+c.pend)+'</span></div>'+
       '<div class="rowline"><span>Interés mensual real</span><span class="num">'+(i.tasaConocida?pct(c.tasa):"—")+'</span></div>'+
@@ -1190,13 +1256,23 @@ function eventosDelMes(mes){
   });
   obligaciones(mes).forEach(function(o){
     out.push({dia:+o.dia||0, tipo:o.tipo, concepto:o.concepto, detalle:o.detalle,
-      monto:o.monto, clave:o.clave, mes:o.mes, pagado:pagado(o.clave,o.mes)});
+      monto:o.monto, clave:o.clave, mes:o.mes, pagado:pagado(o.clave,o.mes),
+      prioridad:o.prioridad||"Media"});
   });
   S.fijos.forEach(function(f){
     if(f.pago!=="Automático" || !vigente(f,mes)) return;
     out.push({dia:+f.dia||1, tipo:"auto", concepto:f.concepto,
       detalle:f.categoria+" · débito automático", monto:+f.monto||0, pagado:true});
   });
+  /* lo que quedó debiendo de meses anteriores compite por la plata de este mes */
+  if(mes===mesHoy){
+    atrasos().forEach(function(o){
+      out.push({dia:1, tipo:o.tipo, concepto:o.concepto,
+        detalle:"atrasado de "+mesLbl(o.mes,true)+(o.detalle? " · "+o.detalle : ""),
+        monto:o.monto, clave:o.clave, mes:o.mes, pagado:false,
+        prioridad:o.prioridad||"Alta", atrasado:true});
+    });
+  }
   out.sort(function(a,b){
     var da=a.dia||99, db=b.dia||99;
     if(da!==db) return da-db;
@@ -1268,6 +1344,41 @@ function vAgenda(){
       }).join("")+'</div></section>';
   }
 
+  var pendientes = ev.filter(function(e){ return e.tipo!=="ingreso" && e.tipo!=="auto" && !e.pagado; });
+  var ingresosMesTot = ev.reduce(function(a,e){ return a+(e.tipo==="ingreso"? e.monto:0); },0);
+  var autoTot = ev.reduce(function(a,e){ return a+(e.tipo==="auto"? e.monto:0); },0);
+  var disponible = saldoIni + ingresosMesTot - autoTot - sobre;
+  var necesario = pendientes.reduce(function(a,e){ return a+e.monto; },0);
+  if(pendientes.length && necesario > disponible + 0.5){
+    var orden = pendientes.slice().sort(function(a,b){
+      var pa=prioridadDe(a.prioridad), pb=prioridadDe(b.prioridad);
+      if(pa!==pb) return pa-pb;
+      return (a.dia||99)-(b.dia||99);
+    });
+    var plata = Math.max(0, disponible), entran=[], afuera=[];
+    orden.forEach(function(e){
+      if(plata >= e.monto){ plata -= e.monto; entran.push(e); }
+      else afuera.push(e);
+    });
+    html+='<section class="card alerta">'+
+      '<div class="eyebrow warnc">Si no te alcanza</div>'+
+      '<div class="big warnc">'+money(necesario-Math.max(0,disponible))+'</div>'+
+      '<div class="sub">Te falta eso para cubrir todo el mes. Con '+money(Math.max(0,disponible))+
+        ' disponible, siguiendo la prioridad que definiste cubrís esto:</div>'+
+      '<div style="margin-top:10px">'+entran.map(function(e){
+        return '<div class="rowline"><div><div style="font-weight:600">'+esc(e.concepto)+'</div>'+
+          '<div class="sub">prioridad '+esc(e.prioridad||"Media")+(e.dia? ' · día '+e.dia:'')+'</div></div>'+
+          '<div class="num pos">'+money(e.monto)+'</div></div>'; }).join("")+'</div>'+
+      '<div class="eyebrow warnc" style="margin-top:14px">Queda sin pagar</div>'+
+      '<div style="margin-top:6px">'+afuera.map(function(e){
+        return '<div class="rowline"><div><div style="font-weight:600">'+esc(e.concepto)+'</div>'+
+          '<div class="sub">prioridad '+esc(e.prioridad||"Media")+(e.dia? ' · día '+e.dia:'')+'</div></div>'+
+          '<div class="num neg">'+money(e.monto)+'</div></div>'; }).join("")+'</div>'+
+      '<div class="note">Lo que quede sin pagar pasa a atrasado el mes que viene y se suma a lo que debés. '+
+        'Podés cambiar la prioridad de cada cosa en Ajustes.</div>'+
+    '</section>';
+  }
+
   html+='<section class="card"><div class="eyebrow">Qué pagar y cuándo</div>';
   if(!filas.length && !ev.length){
     html+='<div class="empty">No hay vencimientos cargados para este mes.</div>';
@@ -1315,7 +1426,8 @@ function vMeses(){
         '<div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px">'+
           '<span style="font-weight:600">'+esc(mesLbl(d.mes,true))+'</span>'+
           '<span class="num '+(d.balance<0?"neg":"pos")+'" style="font-weight:600">'+money(d.balance)+'</span></div>'+
-        '<div class="sub">'+money(d.ingresos)+' entra · '+money(d.gastos)+' sale · saldo '+money(d.saldo)+'</div>'+
+        '<div class="sub">'+money(d.ingresos)+' entra · '+money(d.gastos)+' sale'+
+          (d.ahorro>0? ' · '+money(d.ahorro)+' al ahorro':'')+' · saldo '+money(d.saldo)+'</div>'+
       '</button>'+
       (abierto? '<div style="padding:0 14px 14px">'+
         '<div class="rowline"><span>Gastos fijos</span><span class="num">'+money(d.fijos)+'</span></div>'+
@@ -1323,7 +1435,9 @@ function vMeses(){
         '<div class="rowline"><span>Gastos en efectivo</span><span class="num">'+money(d.efectivo)+'</span></div>'+
         (d.atrasado>0? '<div class="rowline"><span class="warnc">Atrasado de antes</span><span class="num warnc">'+money(d.atrasado)+'</span></div>':'')+
         (d.plan>0? '<div class="rowline"><span>De eso, planificado</span><span class="num">'+money(d.plan)+'</span></div>':'')+
-        '<div class="rowline"><span><strong>Total</strong></span><span class="num"><strong>'+money(d.gastos)+'</strong></span></div>'+
+        '<div class="rowline"><span><strong>Total gastos</strong></span><span class="num"><strong>'+money(d.gastos)+'</strong></span></div>'+
+        '<div class="rowline"><span>Te sobra antes de ahorrar</span><span class="num">'+money(d.sobrante)+'</span></div>'+
+        (d.ahorro>0? '<div class="rowline"><span>Apartado para metas</span><span class="num">'+money(d.ahorro)+'</span></div>':'')+
         '<div class="rowline"><span><strong>Saldo al cierre</strong></span><span class="num '+
           (d.saldo<0?"neg":"pos")+'"><strong>'+money(d.saldo)+'</strong></span></div>'+
       '</div>':'')+
@@ -1399,6 +1513,16 @@ function vAjustes(){
           '<div><label for="man-'+m.id+'">Mantenimiento</label>'+
             '<input id="man-'+m.id+'" type="number" inputmode="decimal" value="'+(m.mant||"")+'" placeholder="0" data-medcampo="mant" data-medid="'+m.id+'"></div>'+
         '</div>' : '')+
+        '<div class="split" style="margin-top:8px">'+
+          '<div><label for="pri-'+m.id+'">Prioridad de pago</label>'+
+            '<select id="pri-'+m.id+'" data-medcampo="prioridad" data-medid="'+m.id+'">'+
+            ["Alta","Media","Baja"].map(function(x){
+              return '<option'+((m.prioridad||"Media")===x?' selected':'')+'>'+x+'</option>'; }).join("")+
+            '</select></div>'+
+          (cred? '<div><label for="qui-'+m.id+'">Quita de intereses al cancelar</label>'+
+            '<input id="qui-'+m.id+'" type="number" min="0" max="100" value="'+
+              Math.round((m.quita===undefined?1:m.quita)*100)+'" data-medcampo="quita" data-medid="'+m.id+'"></div>' : '<div></div>')+
+        '</div>'+
       '</div>';
     }).join("")+
     '<div class="note">El mantenimiento se cobra todos los meses mientras la tarjeta esté activa: '+
@@ -1438,8 +1562,11 @@ function vAjustes(){
     S.fijos.map(function(x){
       return '<div class="rowline"><div><div style="font-weight:600">'+esc(x.concepto)+'</div>'+
         '<div class="sub">'+esc(x.categoria)+'</div>'+
-        '<button class="btn ghost mini" data-pagotipo="'+x.id+'" style="margin-top:4px; padding:3px 8px; font-size:11px">'+
-          (x.pago==="Automático"?"Débito automático":"Lo marco a mano")+'</button></div>'+
+        '<div style="margin-top:4px; display:flex; gap:6px; flex-wrap:wrap">'+
+        '<button class="btn ghost mini" data-pagotipo="'+x.id+'" style="padding:3px 8px; font-size:11px">'+
+          (x.pago==="Automático"?"Débito automático":"Lo marco a mano")+'</button>'+
+        '<button class="btn ghost mini" data-fprio="'+x.id+'" style="padding:3px 8px; font-size:11px">'+
+          'Prioridad '+esc(x.prioridad||"Media")+'</button></div></div>'+
         '<div style="text-align:right"><div class="num">'+money(x.monto)+'</div>'+
         '<button class="btn ghost mini" data-delf="'+x.id+'" style="margin-top:4px; padding:3px 8px; font-size:11px">Borrar</button></div></div>';
     }).join("")+
@@ -1556,7 +1683,12 @@ function vAjustes(){
       var m=itemPorId(S.medios, inp.getAttribute("data-medid"));
       if(!m) return;
       var campo=inp.getAttribute("data-medcampo"), v=+inp.value||0;
-      if(campo==="mant"){
+      if(campo==="prioridad"){ m.prioridad=inp.value; }
+      else if(campo==="quita"){
+        if(!(v>=0 && v<=100)){ toast("Poné un número entre 0 y 100"); return; }
+        m.quita=v/100;
+      }
+      else if(campo==="mant"){
         m.mant=v;
         if(v>0 && !m.mantDesde) m.mantDesde=mesHoy;
         if(!v) m.mantDesde=null;
@@ -1564,7 +1696,8 @@ function vAjustes(){
       else if(!inp.value) m[campo]=0;
       else { toast("Poné un día entre 1 y 31"); return; }
       if(m.fila) op({action:"updmedio", fila:m.fila, medio:{nombre:m.nombre, tipo:m.tipo,
-        cierre:m.cierre, vence:m.vence, mant:m.mant, mantDesde:m.mantDesde}});
+        cierre:m.cierre, vence:m.vence, mant:m.mant, mantDesde:m.mantDesde,
+        prioridad:m.prioridad, quita:m.quita}});
       cache(); toast("Guardado"); vAjustes();
     });
   });
@@ -1608,9 +1741,11 @@ function altaMedio(idNom, idTipo, idCie, idVen, idMan){
   var m={id:uid(), nombre:nom, tipo:tipo==="credito"?"credito":"efectivo",
          cierre:valorDe(idCie), vence:valorDe(idVen), mant:valorDe(idMan), fila:0};
   m.mantDesde = m.mant>0 ? mesHoy : null;
+  m.prioridad = m.tipo==="credito" ? "Alta" : "Media";
+  m.quita = 1;
   S.medios.push(m);
   op({action:"addmedio", cid:m.id, medio:{nombre:m.nombre, tipo:m.tipo, cierre:m.cierre,
-      vence:m.vence, mant:m.mant, mantDesde:m.mantDesde}});
+      vence:m.vence, mant:m.mant, mantDesde:m.mantDesde, prioridad:m.prioridad, quita:m.quita}});
   cache(); toast("Medio agregado");
   return true;
 }
@@ -1680,6 +1815,16 @@ document.addEventListener("click", function(e){
     else { quitarDeCola(idc); cache(); }
     vAjustes(); return;
   }
+  if((t=e.target.closest("[data-fprio]"))){
+    var fp=itemPorId(S.fijos, t.getAttribute("data-fprio"));
+    if(fp){
+      var ord=["Alta","Media","Baja"];
+      fp.prioridad = ord[(ord.indexOf(fp.prioridad||"Media")+1)%3];
+      if(fp.fila) op({action:"upd", hoja:"Fijos", fila:fp.fila, col:8, val:fp.prioridad});
+      cache(); vAjustes();
+    }
+    return;
+  }
   if((t=e.target.closest("[data-pagotipo]"))){
     var idf=t.getAttribute("data-pagotipo");
     var f=itemPorId(S.fijos, idf);
@@ -1690,7 +1835,8 @@ document.addEventListener("click", function(e){
   }
   if((t=e.target.closest("[data-act]"))){
     var a=t.getAttribute("data-act");
-    if(a==="toggle-agrupar"){ S.config.agruparCuotas=!S.config.agruparCuotas; cache(); vPanel(); }
+    if(a==="ver-prestamos"){ draft.verPrestamos=true; vCargar(); }
+    else if(a==="toggle-agrupar"){ S.config.agruparCuotas=!S.config.agruparCuotas; cache(); vPanel(); }
     else if(a==="toggle-plan"){ S.config.verPlan = S.config.verPlan===false; cache(); vPanel(); }
     else if(a==="set-saldo"){
       var v=parseFloat(document.getElementById("p-saldo").value);
@@ -1718,10 +1864,10 @@ document.addEventListener("click", function(e){
       var gc=document.getElementById("g-con").value.trim(), gm=+document.getElementById("g-mon").value;
       if(!gc||!(gm>0)){ toast("Faltan datos del gasto fijo"); return; }
       var fj={id:uid(), concepto:gc, categoria:document.getElementById("g-cat").value,
-              monto:gm, desde:mesHoy, hasta:null, pago:"Manual"};
+              monto:gm, desde:mesHoy, hasta:null, pago:"Manual", prioridad:"Media"};
       S.fijos.push(fj);
       op({action:"add", hoja:"Fijos", cid:fj.id,
-          vals:[fj.concepto, fj.categoria, fj.monto, fj.desde, "", "Manual", ""]});
+          vals:[fj.concepto, fj.categoria, fj.monto, fj.desde, "", "Manual", "", "Media"]});
       cache(); vAjustes();
     }
     else if(a==="add-meta"){
