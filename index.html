@@ -6,21 +6,22 @@
     <title>Organizador de Finanzas</title>
     <style>
         :root {
-            --bg-oscuro: #121212;
-            --bg-panel: #1e1e1e;
-            --texto-principal: #ffffff;
-            --texto-secundario: #a0a0a0;
-            --ingreso: #2e7d32;
-            --egreso: #c62828;
-            --borde: #333333;
-            --acento: #3f51b5;
+            --bg-principal: #fcfaf8; /* Blanco hueso muy suave */
+            --bg-panel: #ffffff;
+            --texto-principal: #4a4a4a;
+            --texto-secundario: #7a7a7a;
+            --ingreso: #d1e7dd; /* Verde pastel */
+            --egreso: #f8d7da; /* Rojo/Rosa pastel */
+            --borde: #e9ecef;
+            --acento: #cce5ff; /* Azul pastel */
+            --acento-hover: #b8daff;
         }
 
         body {
             margin: 0;
             padding: 0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-oscuro);
+            background-color: var(--bg-principal);
             color: var(--texto-principal);
             display: flex;
             flex-direction: column;
@@ -31,9 +32,10 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1rem 2rem;
+            padding: 10px 20px;
             background-color: var(--bg-panel);
             border-bottom: 1px solid var(--borde);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
         }
 
         .controles-conexion {
@@ -42,23 +44,25 @@
         }
 
         input, select, button {
-            background-color: var(--bg-oscuro);
+            background-color: var(--bg-panel);
             color: var(--texto-principal);
             border: 1px solid var(--borde);
-            padding: 8px 12px;
+            padding: 6px 10px;
             border-radius: 4px;
-            font-size: 14px;
+            font-size: 13px;
         }
 
         button {
             cursor: pointer;
             background-color: var(--acento);
-            border: none;
-            transition: opacity 0.2s;
+            border: 1px solid #b8daff;
+            color: #004085;
+            font-weight: 600;
+            transition: background-color 0.2s;
         }
 
         button:hover {
-            opacity: 0.8;
+            background-color: var(--acento-hover);
         }
 
         .navegacion-meses {
@@ -66,14 +70,15 @@
             align-items: center;
             gap: 15px;
             font-weight: bold;
-            font-size: 1.1rem;
+            font-size: 1rem;
+            color: #555;
         }
 
         main {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
-            padding: 20px;
+            gap: 12px;
+            padding: 12px;
             flex-grow: 1;
             overflow: hidden;
         }
@@ -84,69 +89,95 @@
             display: flex;
             flex-direction: column;
             border: 1px solid var(--borde);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
 
         .cabecera-columna {
-            padding: 15px;
+            padding: 8px 10px;
             text-align: center;
             border-bottom: 1px solid var(--borde);
             font-weight: bold;
-            background-color: rgba(255, 255, 255, 0.05);
+            font-size: 0.95rem;
+            background-color: #f8f9fa;
+            border-radius: 8px 8px 0 0;
+            color: #333;
         }
 
         .contenedor-tarjetas {
             flex-grow: 1;
-            padding: 15px;
+            padding: 8px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 6px; /* Espacio mínimo entre tarjetas */
             min-height: 100px;
         }
 
         .pie-columna {
-            padding: 15px;
+            padding: 8px 10px;
             border-top: 1px solid var(--borde);
             text-align: right;
             font-weight: bold;
-            font-size: 1.1rem;
-            background-color: rgba(255, 255, 255, 0.05);
+            font-size: 1rem;
+            background-color: #f8f9fa;
+            border-radius: 0 0 8px 8px;
         }
 
         .tarjeta {
-            padding: 15px;
-            border-radius: 6px;
+            padding: 6px 10px; /* Reducido a la mitad */
+            border-radius: 4px;
             cursor: grab;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 4px; /* Menos espacio entre título y footer */
             user-select: none;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border: 1px solid rgba(0,0,0,0.05);
+            font-size: 0.85rem; /* Letra un poco más chica */
         }
 
         .tarjeta:active {
             cursor: grabbing;
         }
 
+        .tarjeta.arrastrando {
+            opacity: 0.5;
+        }
+
         .tarjeta.ingreso {
             background-color: var(--ingreso);
+            color: #0f5132;
         }
 
         .tarjeta.egreso {
             background-color: var(--egreso);
+            color: #842029;
         }
 
         .tarjeta-header {
             display: flex;
             justify-content: space-between;
             font-weight: bold;
+            align-items: center;
+        }
+        
+        .tarjeta-nombre {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 60%;
         }
 
         .tarjeta-footer {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 0.9rem;
+            font-size: 0.75rem;
+        }
+        
+        .tarjeta-footer input {
+            margin: 0 4px 0 0;
+            vertical-align: middle;
         }
 
         .modal-overlay {
@@ -155,21 +186,28 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: rgba(0,0,0,0.7);
+            background-color: rgba(0,0,0,0.4);
             display: none;
             justify-content: center;
             align-items: center;
+            z-index: 10;
         }
 
         .modal {
             background-color: var(--bg-panel);
-            padding: 25px;
+            padding: 20px;
             border-radius: 8px;
-            width: 400px;
+            width: 350px;
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 12px;
             border: 1px solid var(--borde);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .modal h3 {
+            margin: 0 0 10px 0;
+            color: #333;
         }
 
         .modal-botones {
@@ -180,8 +218,12 @@
         }
 
         .btn-cancelar {
-            background-color: transparent;
-            border: 1px solid var(--borde);
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            color: #333;
+        }
+        .btn-cancelar:hover {
+            background-color: #e2e6ea;
         }
     </style>
 </head>
@@ -189,36 +231,36 @@
 
     <header>
         <div class="controles-conexion">
-            <input type="text" id="url-script" placeholder="URL de Google Apps Script" style="width: 250px;">
-            <button onclick="conectarPlanilla()">Cargar Datos</button>
+            <input type="text" id="url-script" placeholder="URL de Google Apps Script" style="width: 220px;">
+            <button onclick="conectarPlanilla()">Sincronizar Sheets</button>
         </div>
         <div class="navegacion-meses">
             <button onclick="cambiarMesBase(-1)">&lt;</button>
             <span id="etiqueta-rango-meses">Cargando...</span>
             <button onclick="cambiarMesBase(1)">&gt;</button>
         </div>
-        <button onclick="abrirModal()">+ Nuevo Registro</button>
+        <button onclick="abrirModal()">+ Nuevo Gasto/Ingreso</button>
     </header>
 
     <main>
         <div class="columna">
             <div class="cabecera-columna" id="titulo-mes-1">Mes 1</div>
-            <div class="contenedor-tarjetas" id="col-mes-1" ondrop="soltarTarjeta(event, 0)" ondragover="permitirSoltar(event)"></div>
+            <div class="contenedor-tarjetas" id="col-mes-1" data-indice="0"></div>
             <div class="pie-columna" id="total-mes-1">$ 0.00</div>
         </div>
         <div class="columna">
             <div class="cabecera-columna" id="titulo-mes-2">Mes 2</div>
-            <div class="contenedor-tarjetas" id="col-mes-2" ondrop="soltarTarjeta(event, 1)" ondragover="permitirSoltar(event)"></div>
+            <div class="contenedor-tarjetas" id="col-mes-2" data-indice="1"></div>
             <div class="pie-columna" id="total-mes-2">$ 0.00</div>
         </div>
         <div class="columna">
             <div class="cabecera-columna" id="titulo-mes-3">Mes 3</div>
-            <div class="contenedor-tarjetas" id="col-mes-3" ondrop="soltarTarjeta(event, 2)" ondragover="permitirSoltar(event)"></div>
+            <div class="contenedor-tarjetas" id="col-mes-3" data-indice="2"></div>
             <div class="pie-columna" id="total-mes-3">$ 0.00</div>
         </div>
         <div class="columna">
             <div class="cabecera-columna">Pendientes</div>
-            <div class="contenedor-tarjetas" id="col-pendientes" ondrop="soltarTarjeta(event, 'pendiente')" ondragover="permitirSoltar(event)"></div>
+            <div class="contenedor-tarjetas" id="col-pendientes" data-indice="pendiente"></div>
             <div class="pie-columna" id="total-pendientes">$ 0.00</div>
         </div>
     </main>
@@ -226,16 +268,16 @@
     <div class="modal-overlay" id="modal-nuevo">
         <div class="modal">
             <h3>Nuevo Registro</h3>
-            <input type="text" id="form-nombre" placeholder="Nombre (ej. Alquiler)">
+            <input type="text" id="form-nombre" placeholder="Nombre (ej. Luz, Alquiler, Sueldo)">
             <input type="number" id="form-monto" placeholder="Monto">
             <select id="form-tipo">
-                <option value="egreso">Egreso</option>
+                <option value="egreso">Egreso (Gasto)</option>
                 <option value="ingreso">Ingreso</option>
             </select>
             <input type="date" id="form-fecha">
             <select id="form-estado">
-                <option value="pendiente">Pendiente</option>
-                <option value="asignado">Asignado a mes</option>
+                <option value="pendiente">Dejar en Pendientes</option>
+                <option value="asignado">Asignar a mes correspondiente</option>
             </select>
             <div class="modal-botones">
                 <button class="btn-cancelar" onclick="cerrarModal()">Cancelar</button>
@@ -254,7 +296,24 @@
         const mesesNombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
         function inicializar() {
+            // Cargar datos guardados localmente
+            const datosGuardados = localStorage.getItem('finanzas_datos');
+            if (datosGuardados) {
+                registrosFinancieros = JSON.parse(datosGuardados);
+            }
+            
+            const urlGuardada = localStorage.getItem('finanzas_url');
+            if (urlGuardada) {
+                document.getElementById('url-script').value = urlGuardada;
+                urlBackend = urlGuardada;
+            }
+
+            configurarEventosDragAndDrop();
             renderizarInterfaz();
+        }
+
+        function guardarDatosLocalmente() {
+            localStorage.setItem('finanzas_datos', JSON.stringify(registrosFinancieros));
         }
 
         async function conectarPlanilla() {
@@ -263,17 +322,23 @@
                 alert("Por favor ingrese la URL del script.");
                 return;
             }
+            localStorage.setItem('finanzas_url', urlBackend);
+            
             try {
                 const respuesta = await fetch(`${urlBackend}?accion=leer`);
                 const datos = await respuesta.json();
                 registrosFinancieros = datos;
+                guardarDatosLocalmente();
                 renderizarInterfaz();
+                alert("Datos sincronizados con Google Sheets.");
             } catch (error) {
                 console.error("Error al cargar datos", error);
+                alert("Error al conectar. Trabajando en modo local.");
             }
         }
 
         async function sincronizarConPlanilla() {
+            guardarDatosLocalmente();
             if (!urlBackend) return;
             try {
                 await fetch(urlBackend, {
@@ -282,7 +347,7 @@
                     headers: { 'Content-Type': 'application/json' }
                 });
             } catch (error) {
-                console.error("Error al sincronizar", error);
+                console.error("Error al sincronizar con Sheets", error);
             }
         }
 
@@ -311,7 +376,6 @@
 
         function renderizarInterfaz() {
             const mesesActivos = generarMesesColumnas();
-            
             document.getElementById('etiqueta-rango-meses').innerText = `${mesesActivos[0].nombre} - ${mesesActivos[2].nombre}`;
 
             const columnasHTML = [
@@ -359,17 +423,25 @@
             div.className = `tarjeta ${registro.tipo}`;
             div.draggable = true;
             div.id = registro.id;
-            div.ondragstart = iniciarArrastre;
+
+            div.addEventListener('dragstart', () => {
+                div.classList.add('arrastrando');
+            });
+
+            div.addEventListener('dragend', () => {
+                div.classList.remove('arrastrando');
+                actualizarOrdenEnDatos();
+            });
 
             const estaPagado = registro.pagado ? 'checked' : '';
 
             div.innerHTML = `
                 <div class="tarjeta-header">
-                    <span>${registro.nombre}</span>
+                    <span class="tarjeta-nombre" title="${registro.nombre}">${registro.nombre}</span>
                     <span>$${registro.monto.toFixed(2)}</span>
                 </div>
                 <div class="tarjeta-footer">
-                    <span>${registro.fecha}</span>
+                    <span>${registro.fecha.substring(8,10)}/${registro.fecha.substring(5,7)}</span>
                     <label>
                         <input type="checkbox" onchange="alternarEstadoPago('${registro.id}', this.checked)" ${estaPagado}> Pago
                     </label>
@@ -378,33 +450,88 @@
             return div;
         }
 
-        function iniciarArrastre(evento) {
-            evento.dataTransfer.setData('text/plain', evento.target.id);
-        }
-
-        function permitirSoltar(evento) {
-            evento.preventDefault();
-        }
-
-        function soltarTarjeta(evento, destino) {
-            evento.preventDefault();
-            const idRegistro = evento.dataTransfer.getData('text/plain');
-            const registro = registrosFinancieros.find(r => r.id === idRegistro);
+        function configurarEventosDragAndDrop() {
+            const contenedores = document.querySelectorAll('.contenedor-tarjetas');
             
-            if (!registro) return;
+            contenedores.forEach(contenedor => {
+                contenedor.addEventListener('dragover', e => {
+                    e.preventDefault(); // Permite soltar
+                    const elementoPosterior = obtenerElementoPosteriorArrastre(contenedor, e.clientY);
+                    const tarjetaArrastrada = document.querySelector('.arrastrando');
+                    
+                    if (tarjetaArrastrada) {
+                        if (elementoPosterior == null) {
+                            contenedor.appendChild(tarjetaArrastrada);
+                        } else {
+                            contenedor.insertBefore(tarjetaArrastrada, elementoPosterior);
+                        }
+                    }
+                });
 
-            if (destino === 'pendiente') {
-                registro.estado = 'pendiente';
-            } else {
-                const mesesActivos = generarMesesColumnas();
-                registro.estado = 'asignado';
-                const fechaDestino = mesesActivos[destino].fecha;
-                
-                const dia = registro.fecha ? registro.fecha.substring(8, 10) : '01';
-                registro.fecha = `${obtenerIdentificadorMes(fechaDestino)}-${dia}`;
-            }
+                contenedor.addEventListener('drop', e => {
+                    e.preventDefault();
+                    const tarjetaArrastrada = document.querySelector('.arrastrando');
+                    if(!tarjetaArrastrada) return;
+                    
+                    const idRegistro = tarjetaArrastrada.id;
+                    const registro = registrosFinancieros.find(r => r.id === idRegistro);
+                    const destino = contenedor.getAttribute('data-indice');
+                    
+                    if (destino === 'pendiente') {
+                        registro.estado = 'pendiente';
+                    } else {
+                        const mesesActivos = generarMesesColumnas();
+                        registro.estado = 'asignado';
+                        const fechaDestino = mesesActivos[parseInt(destino)].fecha;
+                        const dia = registro.fecha ? registro.fecha.substring(8, 10) : '01';
+                        registro.fecha = `${obtenerIdentificadorMes(fechaDestino)}-${dia}`;
+                    }
+                    
+                    // Al soltar se dispara dragend en la tarjeta, el cual llama a actualizarOrdenEnDatos()
+                });
+            });
+        }
 
-            renderizarInterfaz();
+        // Calcula en qué posición exacta debe caer la tarjeta dentro de la columna
+        function obtenerElementoPosteriorArrastre(contenedor, y) {
+            const elementosArrastrables = [...contenedor.querySelectorAll('.tarjeta:not(.arrastrando)')];
+
+            return elementosArrastrables.reduce((masCercano, hijo) => {
+                const caja = hijo.getBoundingClientRect();
+                const compensacion = y - caja.top - caja.height / 2;
+                if (compensacion < 0 && compensacion > masCercano.compensacion) {
+                    return { offset: compensacion, element: hijo };
+                } else {
+                    return masCercano;
+                }
+            }, { compensacion: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        // Esta función lee el nuevo orden del DOM y reordena el array original
+        function actualizarOrdenEnDatos() {
+            const nuevoArray = [];
+            const contenedores = document.querySelectorAll('.contenedor-tarjetas');
+            
+            // Primero procesamos las tarjetas que están en las columnas visibles (respetando su nuevo orden)
+            contenedores.forEach(contenedor => {
+                const tarjetas = contenedor.querySelectorAll('.tarjeta');
+                tarjetas.forEach(tarjetaDOM => {
+                    const registroEncontrado = registrosFinancieros.find(r => r.id === tarjetaDOM.id);
+                    if(registroEncontrado) {
+                        nuevoArray.push(registroEncontrado);
+                    }
+                });
+            });
+
+            // Luego añadimos cualquier registro que por estar en otro mes oculto no esté en el DOM actual
+            registrosFinancieros.forEach(registro => {
+                if(!nuevoArray.find(r => r.id === registro.id)) {
+                    nuevoArray.push(registro);
+                }
+            });
+
+            registrosFinancieros = nuevoArray;
+            renderizarInterfaz(); // Recalcula los totales
             sincronizarConPlanilla();
         }
 
@@ -418,6 +545,8 @@
 
         function abrirModal() {
             document.getElementById('modal-nuevo').style.display = 'flex';
+            // Poner fecha de hoy por defecto
+            document.getElementById('form-fecha').valueAsDate = new Date();
         }
 
         function cerrarModal() {
@@ -434,7 +563,7 @@
             const estado = document.getElementById('form-estado').value;
 
             if (!nombre || isNaN(monto) || !fecha) {
-                alert("Complete todos los campos requeridos.");
+                alert("Complete todos los campos requeridos (Nombre, Monto, Fecha).");
                 return;
             }
 
