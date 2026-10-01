@@ -3,18 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Organizador de Finanzas</title>
+    <title>Organizador de Finanzas Pastel</title>
     <style>
         :root {
-            --bg-principal: #fcfaf8; /* Blanco hueso muy suave */
+            --bg-principal: #fcfaf8; 
             --bg-panel: #ffffff;
             --texto-principal: #4a4a4a;
             --texto-secundario: #7a7a7a;
-            --ingreso: #d1e7dd; /* Verde pastel */
-            --egreso: #f8d7da; /* Rojo/Rosa pastel */
+            --ingreso: #d1e7dd; 
+            --egreso: #f8d7da; 
             --borde: #e9ecef;
-            --acento: #cce5ff; /* Azul pastel */
+            --acento: #cce5ff; 
             --acento-hover: #b8daff;
+        }
+
+        * {
+            box-sizing: border-box;
         }
 
         body {
@@ -25,7 +29,8 @@
             color: var(--texto-principal);
             display: flex;
             flex-direction: column;
-            height: 100vh;
+            height: 100vh; /* Ocupa el 100% de la pantalla */
+            overflow: hidden; /* Evita el scroll de toda la pagina */
         }
 
         header {
@@ -36,6 +41,7 @@
             background-color: var(--bg-panel);
             border-bottom: 1px solid var(--borde);
             box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+            flex-shrink: 0;
         }
 
         .controles-conexion {
@@ -75,12 +81,13 @@
         }
 
         main {
+            /* Modificado: 3 columnas normales y 1 casi el doble de ancha */
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: 1fr 1fr 1fr 1.8fr; 
             gap: 12px;
             padding: 12px;
             flex-grow: 1;
-            overflow: hidden;
+            overflow: hidden; /* Mantiene la cuadricula estatica */
         }
 
         .columna {
@@ -90,6 +97,8 @@
             flex-direction: column;
             border: 1px solid var(--borde);
             box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            height: 100%; /* Asegura que tome todo el alto disponible */
+            overflow: hidden;
         }
 
         .cabecera-columna {
@@ -99,18 +108,25 @@
             font-weight: bold;
             font-size: 0.95rem;
             background-color: #f8f9fa;
-            border-radius: 8px 8px 0 0;
             color: #333;
+            flex-shrink: 0;
         }
 
         .contenedor-tarjetas {
             flex-grow: 1;
             padding: 8px;
-            overflow-y: auto;
+            overflow-y: auto; /* Habilita el scroll vertical interno !Importante! */
+            min-height: 0; /* Truco de Flexbox para que el overflow funcione */
             display: flex;
             flex-direction: column;
-            gap: 6px; /* Espacio mínimo entre tarjetas */
-            min-height: 100px;
+            gap: 6px;
+        }
+
+        /* Clase especial para que Pendientes tenga 2 columnas internas */
+        .contenedor-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            align-content: start; /* Para que las tarjetas no se estiren verticalmente */
         }
 
         .pie-columna {
@@ -120,20 +136,20 @@
             font-weight: bold;
             font-size: 1rem;
             background-color: #f8f9fa;
-            border-radius: 0 0 8px 8px;
+            flex-shrink: 0;
         }
 
         .tarjeta {
-            padding: 6px 10px; /* Reducido a la mitad */
+            padding: 6px 10px; 
             border-radius: 4px;
             cursor: grab;
             display: flex;
             flex-direction: column;
-            gap: 4px; /* Menos espacio entre título y footer */
+            gap: 4px; 
             user-select: none;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
             border: 1px solid rgba(0,0,0,0.05);
-            font-size: 0.85rem; /* Letra un poco más chica */
+            font-size: 0.85rem; 
         }
 
         .tarjeta:active {
@@ -141,18 +157,12 @@
         }
 
         .tarjeta.arrastrando {
-            opacity: 0.5;
+            opacity: 0.4;
+            transform: scale(0.98);
         }
 
-        .tarjeta.ingreso {
-            background-color: var(--ingreso);
-            color: #0f5132;
-        }
-
-        .tarjeta.egreso {
-            background-color: var(--egreso);
-            color: #842029;
-        }
+        .tarjeta.ingreso { background-color: var(--ingreso); color: #0f5132; }
+        .tarjeta.egreso { background-color: var(--egreso); color: #842029; }
 
         .tarjeta-header {
             display: flex;
@@ -165,7 +175,7 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            max-width: 60%;
+            max-width: 65%;
         }
 
         .tarjeta-footer {
@@ -176,55 +186,34 @@
         }
         
         .tarjeta-footer input {
-            margin: 0 4px 0 0;
+            margin: 0 3px 0 0;
             vertical-align: middle;
         }
 
+        .saldo-fila {
+            font-size: 0.65rem;
+            color: #555;
+            background-color: rgba(255,255,255,0.4);
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-weight: 600;
+        }
+
+        /* Modal (sin cambios) */
         .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background-color: rgba(0,0,0,0.4);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 10;
+            display: none; justify-content: center; align-items: center; z-index: 10;
         }
-
         .modal {
-            background-color: var(--bg-panel);
-            padding: 20px;
-            border-radius: 8px;
-            width: 350px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            border: 1px solid var(--borde);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            background-color: var(--bg-panel); padding: 20px; border-radius: 8px;
+            width: 350px; display: flex; flex-direction: column; gap: 12px;
+            border: 1px solid var(--borde); box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
-        
-        .modal h3 {
-            margin: 0 0 10px 0;
-            color: #333;
-        }
-
-        .modal-botones {
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        .btn-cancelar {
-            background-color: #f8f9fa;
-            border: 1px solid #ddd;
-            color: #333;
-        }
-        .btn-cancelar:hover {
-            background-color: #e2e6ea;
-        }
+        .modal h3 { margin: 0 0 10px 0; color: #333; }
+        .modal-botones { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+        .btn-cancelar { background-color: #f8f9fa; border: 1px solid #ddd; color: #333; }
+        .btn-cancelar:hover { background-color: #e2e6ea; }
     </style>
 </head>
 <body>
@@ -260,7 +249,8 @@
         </div>
         <div class="columna">
             <div class="cabecera-columna">Pendientes</div>
-            <div class="contenedor-tarjetas" id="col-pendientes" data-indice="pendiente"></div>
+            <!-- Se agregó la clase contenedor-grid -->
+            <div class="contenedor-tarjetas contenedor-grid" id="col-pendientes" data-indice="pendiente"></div>
             <div class="pie-columna" id="total-pendientes">$ 0.00</div>
         </div>
     </main>
@@ -268,7 +258,7 @@
     <div class="modal-overlay" id="modal-nuevo">
         <div class="modal">
             <h3>Nuevo Registro</h3>
-            <input type="text" id="form-nombre" placeholder="Nombre (ej. Luz, Alquiler, Sueldo)">
+            <input type="text" id="form-nombre" placeholder="Nombre (ej. Luz, Alquiler)">
             <input type="number" id="form-monto" placeholder="Monto">
             <select id="form-tipo">
                 <option value="egreso">Egreso (Gasto)</option>
@@ -290,17 +280,12 @@
         let registrosFinancieros = [];
         let fechaBase = new Date();
         fechaBase.setDate(1); 
-        
         let urlBackend = "";
-
         const mesesNombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
         function inicializar() {
-            // Cargar datos guardados localmente
             const datosGuardados = localStorage.getItem('finanzas_datos');
-            if (datosGuardados) {
-                registrosFinancieros = JSON.parse(datosGuardados);
-            }
+            if (datosGuardados) registrosFinancieros = JSON.parse(datosGuardados);
             
             const urlGuardada = localStorage.getItem('finanzas_url');
             if (urlGuardada) {
@@ -318,12 +303,9 @@
 
         async function conectarPlanilla() {
             urlBackend = document.getElementById('url-script').value;
-            if (!urlBackend) {
-                alert("Por favor ingrese la URL del script.");
-                return;
-            }
-            localStorage.setItem('finanzas_url', urlBackend);
+            if (!urlBackend) return alert("Por favor ingrese la URL del script.");
             
+            localStorage.setItem('finanzas_url', urlBackend);
             try {
                 const respuesta = await fetch(`${urlBackend}?accion=leer`);
                 const datos = await respuesta.json();
@@ -333,7 +315,7 @@
                 alert("Datos sincronizados con Google Sheets.");
             } catch (error) {
                 console.error("Error al cargar datos", error);
-                alert("Error al conectar. Trabajando en modo local.");
+                alert("Error de conexión. Trabajando en modo local.");
             }
         }
 
@@ -344,10 +326,10 @@
                 await fetch(urlBackend, {
                     method: 'POST',
                     body: JSON.stringify(registrosFinancieros),
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' } // Corregido para evitar error CORS
                 });
             } catch (error) {
-                console.error("Error al sincronizar con Sheets", error);
+                console.error("Error al sincronizar", error);
             }
         }
 
@@ -385,55 +367,74 @@
                 document.getElementById('col-pendientes')
             ];
 
-            const totales = [0, 0, 0, 0];
-
+            // Limpiar HTML
             columnasHTML.forEach(col => col.innerHTML = '');
-
             for (let i = 0; i < 3; i++) {
                 document.getElementById(`titulo-mes-${i+1}`).innerText = mesesActivos[i].nombre;
             }
 
+            // Variables para totales y saldos acumulados fila por fila
+            const totales = [0, 0, 0, 0];
+            const saldosAcumulados = [0, 0, 0];
+
             registrosFinancieros.forEach(registro => {
-                const tarjeta = construirTarjeta(registro);
-                
+                let colDestino = -1;
+
                 if (registro.estado === 'pendiente') {
-                    columnasHTML[3].appendChild(tarjeta);
-                    totales[3] += (registro.tipo === 'ingreso' ? registro.monto : -registro.monto);
+                    colDestino = 3;
                 } else {
                     const idMesRegistro = registro.fecha.substring(0, 7);
-                    
                     for (let i = 0; i < 3; i++) {
                         if (mesesActivos[i].identificador === idMesRegistro) {
-                            columnasHTML[i].appendChild(tarjeta);
-                            totales[i] += (registro.tipo === 'ingreso' ? registro.monto : -registro.monto);
+                            colDestino = i;
                             break;
                         }
                     }
                 }
+
+                if (colDestino !== -1) {
+                    const montoReal = registro.tipo === 'ingreso' ? registro.monto : -registro.monto;
+                    
+                    if (colDestino < 3) {
+                        // Es un mes, sumamos al saldo acumulado de esa fila
+                        saldosAcumulados[colDestino] += montoReal;
+                        totales[colDestino] = saldosAcumulados[colDestino];
+                        
+                        // Construimos tarjeta pasándole el saldo actual
+                        const tarjeta = construirTarjeta(registro, saldosAcumulados[colDestino], false);
+                        columnasHTML[colDestino].appendChild(tarjeta);
+                    } else {
+                        // Es pendiente, no se muestra saldo por fila, solo suma al total
+                        totales[3] += montoReal;
+                        const tarjeta = construirTarjeta(registro, 0, true);
+                        columnasHTML[3].appendChild(tarjeta);
+                    }
+                }
             });
 
+            // Imprimir totales abajo
             for (let i = 0; i < 3; i++) {
                 document.getElementById(`total-mes-${i+1}`).innerText = `$ ${totales[i].toFixed(2)}`;
             }
             document.getElementById('total-pendientes').innerText = `$ ${totales[3].toFixed(2)}`;
         }
 
-        function construirTarjeta(registro) {
+        function construirTarjeta(registro, saldoFila, esPendiente) {
             const div = document.createElement('div');
             div.className = `tarjeta ${registro.tipo}`;
             div.draggable = true;
             div.id = registro.id;
 
-            div.addEventListener('dragstart', () => {
-                div.classList.add('arrastrando');
-            });
-
+            div.addEventListener('dragstart', () => div.classList.add('arrastrando'));
             div.addEventListener('dragend', () => {
                 div.classList.remove('arrastrando');
                 actualizarOrdenEnDatos();
             });
 
             const estaPagado = registro.pagado ? 'checked' : '';
+            
+            // HTML del saldo solo si NO es pendiente
+            const htmlSaldo = esPendiente ? '' : `<span class="saldo-fila" title="Saldo acumulado">S: $${saldoFila.toFixed(0)}</span>`;
 
             div.innerHTML = `
                 <div class="tarjeta-header">
@@ -441,7 +442,10 @@
                     <span>$${registro.monto.toFixed(2)}</span>
                 </div>
                 <div class="tarjeta-footer">
-                    <span>${registro.fecha.substring(8,10)}/${registro.fecha.substring(5,7)}</span>
+                    <span>
+                        ${registro.fecha.substring(8,10)}/${registro.fecha.substring(5,7)}
+                    </span>
+                    ${htmlSaldo}
                     <label>
                         <input type="checkbox" onchange="alternarEstadoPago('${registro.id}', this.checked)" ${estaPagado}> Pago
                     </label>
@@ -455,8 +459,9 @@
             
             contenedores.forEach(contenedor => {
                 contenedor.addEventListener('dragover', e => {
-                    e.preventDefault(); // Permite soltar
-                    const elementoPosterior = obtenerElementoPosteriorArrastre(contenedor, e.clientY);
+                    e.preventDefault(); 
+                    // Se envía X e Y para calcular en cuadrículas
+                    const elementoPosterior = obtenerElementoPosteriorArrastre(contenedor, e.clientX, e.clientY);
                     const tarjetaArrastrada = document.querySelector('.arrastrando');
                     
                     if (tarjetaArrastrada) {
@@ -473,8 +478,7 @@
                     const tarjetaArrastrada = document.querySelector('.arrastrando');
                     if(!tarjetaArrastrada) return;
                     
-                    const idRegistro = tarjetaArrastrada.id;
-                    const registro = registrosFinancieros.find(r => r.id === idRegistro);
+                    const registro = registrosFinancieros.find(r => r.id === tarjetaArrastrada.id);
                     const destino = contenedor.getAttribute('data-indice');
                     
                     if (destino === 'pendiente') {
@@ -486,52 +490,47 @@
                         const dia = registro.fecha ? registro.fecha.substring(8, 10) : '01';
                         registro.fecha = `${obtenerIdentificadorMes(fechaDestino)}-${dia}`;
                     }
-                    
-                    // Al soltar se dispara dragend en la tarjeta, el cual llama a actualizarOrdenEnDatos()
                 });
             });
         }
 
-        // Calcula en qué posición exacta debe caer la tarjeta dentro de la columna
-        function obtenerElementoPosteriorArrastre(contenedor, y) {
-            const elementosArrastrables = [...contenedor.querySelectorAll('.tarjeta:not(.arrastrando)')];
-
-            return elementosArrastrables.reduce((masCercano, hijo) => {
+        // Calcula dinámicamente utilizando X e Y para soportar listas y cuadrículas (2D)
+        function obtenerElementoPosteriorArrastre(contenedor, x, y) {
+            const elementos = [...contenedor.querySelectorAll('.tarjeta:not(.arrastrando)')];
+            return elementos.reduce((masCercano, hijo) => {
                 const caja = hijo.getBoundingClientRect();
-                const compensacion = y - caja.top - caja.height / 2;
-                if (compensacion < 0 && compensacion > masCercano.compensacion) {
-                    return { offset: compensacion, element: hijo };
-                } else {
-                    return masCercano;
+                
+                // Determinamos si el mouse está "antes" de la mitad de la tarjeta
+                const cursorAntesDelCentro = (y < caja.top + caja.height / 2) || (y < caja.bottom && x < caja.left + caja.width / 2);
+
+                if (cursorAntesDelCentro) {
+                    const distanciaX = x - (caja.left + caja.width / 2);
+                    const distanciaY = y - (caja.top + caja.height / 2);
+                    const distanciaTotal = Math.sqrt(distanciaX * distanciaX + distanciaY * distanciaY);
+                    
+                    if (distanciaTotal < masCercano.distancia) {
+                        return { distancia: distanciaTotal, element: hijo };
+                    }
                 }
-            }, { compensacion: Number.NEGATIVE_INFINITY }).element;
+                return masCercano;
+            }, { distancia: Number.POSITIVE_INFINITY }).element;
         }
 
-        // Esta función lee el nuevo orden del DOM y reordena el array original
         function actualizarOrdenEnDatos() {
             const nuevoArray = [];
-            const contenedores = document.querySelectorAll('.contenedor-tarjetas');
-            
-            // Primero procesamos las tarjetas que están en las columnas visibles (respetando su nuevo orden)
-            contenedores.forEach(contenedor => {
-                const tarjetas = contenedor.querySelectorAll('.tarjeta');
-                tarjetas.forEach(tarjetaDOM => {
-                    const registroEncontrado = registrosFinancieros.find(r => r.id === tarjetaDOM.id);
-                    if(registroEncontrado) {
-                        nuevoArray.push(registroEncontrado);
-                    }
+            document.querySelectorAll('.contenedor-tarjetas').forEach(contenedor => {
+                contenedor.querySelectorAll('.tarjeta').forEach(tarjetaDOM => {
+                    const r = registrosFinancieros.find(r => r.id === tarjetaDOM.id);
+                    if(r) nuevoArray.push(r);
                 });
             });
 
-            // Luego añadimos cualquier registro que por estar en otro mes oculto no esté en el DOM actual
             registrosFinancieros.forEach(registro => {
-                if(!nuevoArray.find(r => r.id === registro.id)) {
-                    nuevoArray.push(registro);
-                }
+                if(!nuevoArray.find(r => r.id === registro.id)) nuevoArray.push(registro);
             });
 
             registrosFinancieros = nuevoArray;
-            renderizarInterfaz(); // Recalcula los totales
+            renderizarInterfaz(); 
             sincronizarConPlanilla();
         }
 
@@ -545,7 +544,6 @@
 
         function abrirModal() {
             document.getElementById('modal-nuevo').style.display = 'flex';
-            // Poner fecha de hoy por defecto
             document.getElementById('form-fecha').valueAsDate = new Date();
         }
 
@@ -558,26 +556,22 @@
         function guardarNuevoRegistro() {
             const nombre = document.getElementById('form-nombre').value;
             const monto = parseFloat(document.getElementById('form-monto').value);
-            const tipo = document.getElementById('form-tipo').value;
             let fecha = document.getElementById('form-fecha').value;
-            const estado = document.getElementById('form-estado').value;
 
             if (!nombre || isNaN(monto) || !fecha) {
-                alert("Complete todos los campos requeridos (Nombre, Monto, Fecha).");
-                return;
+                return alert("Complete Nombre, Monto y Fecha.");
             }
 
-            const nuevoRegistro = {
+            registrosFinancieros.push({
                 id: 'id_' + Date.now(),
                 nombre: nombre,
                 monto: monto,
-                tipo: tipo,
+                tipo: document.getElementById('form-tipo').value,
                 fecha: fecha,
-                estado: estado,
+                estado: document.getElementById('form-estado').value,
                 pagado: false
-            };
+            });
 
-            registrosFinancieros.push(nuevoRegistro);
             renderizarInterfaz();
             cerrarModal();
             sincronizarConPlanilla();
