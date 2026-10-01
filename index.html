@@ -6,15 +6,18 @@
     <title>Organizador de Finanzas Pastel</title>
     <style>
         :root {
-            --bg-principal: #fcfaf8; 
-            --bg-panel: #ffffff;
+            /* Colores ajustados para que no sean "tan blancos" */
+            --bg-principal: #eaebe8; /* Gris muy suave y cálido */
+            --bg-panel: #f4f5f2;     /* Un tono apenas más claro para los paneles */
             --texto-principal: #4a4a4a;
-            --texto-secundario: #7a7a7a;
+            --texto-secundario: #6c757d;
             --ingreso: #d1e7dd; 
             --egreso: #f8d7da; 
-            --borde: #e9ecef;
+            --borde: #dcdedb;
             --acento: #cce5ff; 
             --acento-hover: #b8daff;
+            --gris-pagado: #e2e6ea;
+            --texto-pagado: #8a939b;
         }
 
         * {
@@ -29,8 +32,8 @@
             color: var(--texto-principal);
             display: flex;
             flex-direction: column;
-            height: 100vh; /* Ocupa el 100% de la pantalla */
-            overflow: hidden; /* Evita el scroll de toda la pagina */
+            height: 100vh; 
+            overflow: hidden; 
         }
 
         header {
@@ -50,7 +53,7 @@
         }
 
         input, select, button {
-            background-color: var(--bg-panel);
+            background-color: #ffffff;
             color: var(--texto-principal);
             border: 1px solid var(--borde);
             padding: 6px 10px;
@@ -67,9 +70,9 @@
             transition: background-color 0.2s;
         }
 
-        button:hover {
-            background-color: var(--acento-hover);
-        }
+        button:hover { background-color: var(--acento-hover); }
+        .btn-secundario { background-color: #e2e3e5; color: #383d41; border-color: #d6d8db; }
+        .btn-secundario:hover { background-color: #d6d8db; }
 
         .navegacion-meses {
             display: flex;
@@ -80,16 +83,64 @@
             color: #555;
         }
 
-        main {
-            /* Modificado: 3 columnas normales y 1 casi el doble de ancha */
+        /* VISTAS */
+        main.vista-columnas {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr 1.8fr; 
             gap: 12px;
             padding: 12px;
             flex-grow: 1;
-            overflow: hidden; /* Mantiene la cuadricula estatica */
+            overflow: hidden; 
         }
 
+        section.vista-dashboard {
+            display: none;
+            padding: 20px;
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+
+        .mostrar-dashboard section.vista-dashboard { display: block; }
+        .mostrar-dashboard main.vista-columnas { display: none; }
+
+        /* DASHBOARD STYLES */
+        .dash-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .dash-card {
+            background: var(--bg-panel);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--borde);
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+        }
+        .dash-card h4 { margin: 0 0 10px 0; color: var(--texto-secundario); font-size: 0.9rem; text-transform: uppercase;}
+        .dash-card .monto { font-size: 1.8rem; font-weight: bold; color: var(--texto-principal); }
+        .dash-card.positivo .monto { color: #0f5132; }
+        .dash-card.negativo .monto { color: #842029; }
+        
+        .dash-detalles {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .dash-panel {
+            background: var(--bg-panel);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--borde);
+        }
+        .dash-panel h3 { margin: 0 0 15px 0; font-size: 1.1rem; border-bottom: 1px solid var(--borde); padding-bottom: 8px;}
+        .cat-item { margin-bottom: 12px; }
+        .cat-header { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 4px; font-weight: 500;}
+        .cat-bar-bg { background: var(--borde); border-radius: 4px; height: 8px; overflow: hidden; }
+        .cat-bar-fill { background: #842029; height: 100%; border-radius: 4px; }
+
+        /* COLUMNAS STYLES */
         .columna {
             background-color: var(--bg-panel);
             border-radius: 8px;
@@ -97,7 +148,7 @@
             flex-direction: column;
             border: 1px solid var(--borde);
             box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-            height: 100%; /* Asegura que tome todo el alto disponible */
+            height: 100%; 
             overflow: hidden;
         }
 
@@ -107,26 +158,24 @@
             border-bottom: 1px solid var(--borde);
             font-weight: bold;
             font-size: 0.95rem;
-            background-color: #f8f9fa;
-            color: #333;
+            background-color: rgba(0,0,0,0.03);
             flex-shrink: 0;
         }
 
         .contenedor-tarjetas {
             flex-grow: 1;
             padding: 8px;
-            overflow-y: auto; /* Habilita el scroll vertical interno !Importante! */
-            min-height: 0; /* Truco de Flexbox para que el overflow funcione */
+            overflow-y: auto; 
+            min-height: 0; 
             display: flex;
             flex-direction: column;
             gap: 6px;
         }
 
-        /* Clase especial para que Pendientes tenga 2 columnas internas */
         .contenedor-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            align-content: start; /* Para que las tarjetas no se estiren verticalmente */
+            align-content: start; 
         }
 
         .pie-columna {
@@ -135,10 +184,11 @@
             text-align: right;
             font-weight: bold;
             font-size: 1rem;
-            background-color: #f8f9fa;
+            background-color: rgba(0,0,0,0.03);
             flex-shrink: 0;
         }
 
+        /* TARJETAS */
         .tarjeta {
             padding: 6px 10px; 
             border-radius: 4px;
@@ -150,19 +200,22 @@
             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
             border: 1px solid rgba(0,0,0,0.05);
             font-size: 0.85rem; 
+            transition: opacity 0.2s, background-color 0.2s;
         }
 
-        .tarjeta:active {
-            cursor: grabbing;
-        }
-
-        .tarjeta.arrastrando {
-            opacity: 0.4;
-            transform: scale(0.98);
-        }
+        .tarjeta:active { cursor: grabbing; }
+        .tarjeta.arrastrando { opacity: 0.4; transform: scale(0.98); }
 
         .tarjeta.ingreso { background-color: var(--ingreso); color: #0f5132; }
         .tarjeta.egreso { background-color: var(--egreso); color: #842029; }
+        
+        /* Estado Pagado (Gris Claro) */
+        .tarjeta.pagada {
+            background-color: var(--gris-pagado) !important;
+            color: var(--texto-pagado) !important;
+            border: 1px solid #ced4da;
+            box-shadow: none;
+        }
 
         .tarjeta-header {
             display: flex;
@@ -176,7 +229,19 @@
             overflow: hidden;
             text-overflow: ellipsis;
             max-width: 65%;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
+        
+        .badge-categoria {
+            font-size: 0.6rem;
+            background-color: rgba(255,255,255,0.4);
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-weight: normal;
+        }
+        .tarjeta.pagada .badge-categoria { background-color: rgba(0,0,0,0.1); }
 
         .tarjeta-footer {
             display: flex;
@@ -188,26 +253,28 @@
         .tarjeta-footer input {
             margin: 0 3px 0 0;
             vertical-align: middle;
+            cursor: pointer;
         }
 
         .saldo-fila {
             font-size: 0.65rem;
             color: #555;
-            background-color: rgba(255,255,255,0.4);
+            background-color: rgba(255,255,255,0.5);
             padding: 2px 4px;
             border-radius: 3px;
             font-weight: 600;
         }
+        .tarjeta.pagada .saldo-fila { background-color: rgba(0,0,0,0.05); color: inherit; }
 
-        /* Modal (sin cambios) */
+        /* Modal */
         .modal-overlay {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background-color: rgba(0,0,0,0.4);
+            background-color: rgba(0,0,0,0.5);
             display: none; justify-content: center; align-items: center; z-index: 10;
         }
         .modal {
             background-color: var(--bg-panel); padding: 20px; border-radius: 8px;
-            width: 350px; display: flex; flex-direction: column; gap: 12px;
+            width: 380px; display: flex; flex-direction: column; gap: 12px;
             border: 1px solid var(--borde); box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
         .modal h3 { margin: 0 0 10px 0; color: #333; }
@@ -222,6 +289,7 @@
         <div class="controles-conexion">
             <input type="text" id="url-script" placeholder="URL de Google Apps Script" style="width: 220px;">
             <button onclick="conectarPlanilla()">Sincronizar Sheets</button>
+            <button class="btn-secundario" id="btn-toggle-vista" onclick="alternarVista()">Ver Dashboard</button>
         </div>
         <div class="navegacion-meses">
             <button onclick="cambiarMesBase(-1)">&lt;</button>
@@ -231,27 +299,59 @@
         <button onclick="abrirModal()">+ Nuevo Gasto/Ingreso</button>
     </header>
 
-    <main>
+    <!-- VISTA DASHBOARD -->
+    <section class="vista-dashboard" id="dashboard-view">
+        <div class="dash-grid">
+            <div class="dash-card">
+                <h4>Total Ingresos (Todos los meses)</h4>
+                <div class="monto positivo" id="dash-ingresos">$ 0</div>
+            </div>
+            <div class="dash-card">
+                <h4>Total Egresos (Todos los meses)</h4>
+                <div class="monto negativo" id="dash-egresos">$ 0</div>
+            </div>
+            <div class="dash-card">
+                <h4>Balance Proyectado Global</h4>
+                <div class="monto" id="dash-balance">$ 0</div>
+            </div>
+        </div>
+        <div class="dash-detalles">
+            <div class="dash-panel">
+                <h3>Gastos por Categoría</h3>
+                <div id="dash-categorias">
+                    <!-- Se llena con JS -->
+                </div>
+            </div>
+            <div class="dash-panel">
+                <h3>Resumen Mensual (Próximos 3 meses)</h3>
+                <div id="dash-meses-resumen">
+                    <!-- Se llena con JS -->
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- VISTA COLUMNAS -->
+    <main class="vista-columnas" id="columnas-view">
         <div class="columna">
             <div class="cabecera-columna" id="titulo-mes-1">Mes 1</div>
             <div class="contenedor-tarjetas" id="col-mes-1" data-indice="0"></div>
-            <div class="pie-columna" id="total-mes-1">$ 0.00</div>
+            <div class="pie-columna" id="total-mes-1">$ 0</div>
         </div>
         <div class="columna">
             <div class="cabecera-columna" id="titulo-mes-2">Mes 2</div>
             <div class="contenedor-tarjetas" id="col-mes-2" data-indice="1"></div>
-            <div class="pie-columna" id="total-mes-2">$ 0.00</div>
+            <div class="pie-columna" id="total-mes-2">$ 0</div>
         </div>
         <div class="columna">
             <div class="cabecera-columna" id="titulo-mes-3">Mes 3</div>
             <div class="contenedor-tarjetas" id="col-mes-3" data-indice="2"></div>
-            <div class="pie-columna" id="total-mes-3">$ 0.00</div>
+            <div class="pie-columna" id="total-mes-3">$ 0</div>
         </div>
         <div class="columna">
             <div class="cabecera-columna">Pendientes</div>
-            <!-- Se agregó la clase contenedor-grid -->
             <div class="contenedor-tarjetas contenedor-grid" id="col-pendientes" data-indice="pendiente"></div>
-            <div class="pie-columna" id="total-pendientes">$ 0.00</div>
+            <div class="pie-columna" id="total-pendientes">$ 0</div>
         </div>
     </main>
 
@@ -259,10 +359,20 @@
         <div class="modal">
             <h3>Nuevo Registro</h3>
             <input type="text" id="form-nombre" placeholder="Nombre (ej. Luz, Alquiler)">
-            <input type="number" id="form-monto" placeholder="Monto">
+            <input type="number" id="form-monto" placeholder="Monto (entero)">
             <select id="form-tipo">
                 <option value="egreso">Egreso (Gasto)</option>
                 <option value="ingreso">Ingreso</option>
+            </select>
+            <select id="form-categoria">
+                <option value="Vivienda">Vivienda</option>
+                <option value="Alimentos">Alimentos</option>
+                <option value="Transporte">Transporte</option>
+                <option value="Servicios">Servicios</option>
+                <option value="Salud">Salud</option>
+                <option value="Entretenimiento">Entretenimiento</option>
+                <option value="Sueldo/Honorarios">Sueldo/Honorarios</option>
+                <option value="Otros">Otros</option>
             </select>
             <input type="date" id="form-fecha">
             <select id="form-estado">
@@ -283,6 +393,11 @@
         let urlBackend = "";
         const mesesNombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
+        // Función de formateo: Sin decimales y con separador de miles
+        function formatearMoneda(valor) {
+            return '$ ' + Math.round(valor).toLocaleString('es-AR');
+        }
+
         function inicializar() {
             const datosGuardados = localStorage.getItem('finanzas_datos');
             if (datosGuardados) registrosFinancieros = JSON.parse(datosGuardados);
@@ -295,6 +410,19 @@
 
             configurarEventosDragAndDrop();
             renderizarInterfaz();
+        }
+
+        function alternarVista() {
+            const body = document.body;
+            const btn = document.getElementById('btn-toggle-vista');
+            if (body.classList.contains('mostrar-dashboard')) {
+                body.classList.remove('mostrar-dashboard');
+                btn.innerText = "Ver Dashboard";
+            } else {
+                body.classList.add('mostrar-dashboard');
+                btn.innerText = "Ver Columnas";
+                renderizarDashboard();
+            }
         }
 
         function guardarDatosLocalmente() {
@@ -326,7 +454,7 @@
                 await fetch(urlBackend, {
                     method: 'POST',
                     body: JSON.stringify(registrosFinancieros),
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' } // Corregido para evitar error CORS
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' } 
                 });
             } catch (error) {
                 console.error("Error al sincronizar", error);
@@ -367,13 +495,11 @@
                 document.getElementById('col-pendientes')
             ];
 
-            // Limpiar HTML
             columnasHTML.forEach(col => col.innerHTML = '');
             for (let i = 0; i < 3; i++) {
                 document.getElementById(`titulo-mes-${i+1}`).innerText = mesesActivos[i].nombre;
             }
 
-            // Variables para totales y saldos acumulados fila por fila
             const totales = [0, 0, 0, 0];
             const saldosAcumulados = [0, 0, 0];
 
@@ -396,15 +522,12 @@
                     const montoReal = registro.tipo === 'ingreso' ? registro.monto : -registro.monto;
                     
                     if (colDestino < 3) {
-                        // Es un mes, sumamos al saldo acumulado de esa fila
                         saldosAcumulados[colDestino] += montoReal;
                         totales[colDestino] = saldosAcumulados[colDestino];
                         
-                        // Construimos tarjeta pasándole el saldo actual
                         const tarjeta = construirTarjeta(registro, saldosAcumulados[colDestino], false);
                         columnasHTML[colDestino].appendChild(tarjeta);
                     } else {
-                        // Es pendiente, no se muestra saldo por fila, solo suma al total
                         totales[3] += montoReal;
                         const tarjeta = construirTarjeta(registro, 0, true);
                         columnasHTML[3].appendChild(tarjeta);
@@ -412,16 +535,19 @@
                 }
             });
 
-            // Imprimir totales abajo
             for (let i = 0; i < 3; i++) {
-                document.getElementById(`total-mes-${i+1}`).innerText = `$ ${totales[i].toFixed(2)}`;
+                document.getElementById(`total-mes-${i+1}`).innerText = formatearMoneda(totales[i]);
             }
-            document.getElementById('total-pendientes').innerText = `$ ${totales[3].toFixed(2)}`;
+            document.getElementById('total-pendientes').innerText = formatearMoneda(totales[3]);
+
+            renderizarDashboard();
         }
 
         function construirTarjeta(registro, saldoFila, esPendiente) {
             const div = document.createElement('div');
-            div.className = `tarjeta ${registro.tipo}`;
+            // Aplicar clase .pagada si el registro está marcado como pagado
+            const clasePagada = registro.pagado ? ' pagada' : '';
+            div.className = `tarjeta ${registro.tipo}${clasePagada}`;
             div.draggable = true;
             div.id = registro.id;
 
@@ -432,26 +558,104 @@
             });
 
             const estaPagado = registro.pagado ? 'checked' : '';
-            
-            // HTML del saldo solo si NO es pendiente
-            const htmlSaldo = esPendiente ? '' : `<span class="saldo-fila" title="Saldo acumulado">S: $${saldoFila.toFixed(0)}</span>`;
+            const htmlSaldo = esPendiente ? '' : `<span class="saldo-fila" title="Saldo acumulado">S: ${formatearMoneda(saldoFila)}</span>`;
+            const categoria = registro.categoria || 'Otros';
 
+            // Orden invertido en el footer: Fecha -> Check -> Saldo
             div.innerHTML = `
                 <div class="tarjeta-header">
-                    <span class="tarjeta-nombre" title="${registro.nombre}">${registro.nombre}</span>
-                    <span>$${registro.monto.toFixed(2)}</span>
+                    <span class="tarjeta-nombre" title="${registro.nombre}">
+                        ${registro.nombre} 
+                        <span class="badge-categoria">${categoria}</span>
+                    </span>
+                    <span>${formatearMoneda(registro.monto)}</span>
                 </div>
                 <div class="tarjeta-footer">
-                    <span>
-                        ${registro.fecha.substring(8,10)}/${registro.fecha.substring(5,7)}
-                    </span>
-                    ${htmlSaldo}
+                    <span>${registro.fecha.substring(8,10)}/${registro.fecha.substring(5,7)}</span>
                     <label>
                         <input type="checkbox" onchange="alternarEstadoPago('${registro.id}', this.checked)" ${estaPagado}> Pago
                     </label>
+                    ${htmlSaldo}
                 </div>
             `;
             return div;
+        }
+
+        function renderizarDashboard() {
+            let totalIng = 0;
+            let totalEgr = 0;
+            const gastosPorCat = {};
+            const resumenMeses = {};
+
+            const mesesActivos = generarMesesColumnas();
+            mesesActivos.forEach(m => {
+                resumenMeses[m.identificador] = { nombre: m.nombre, ingresos: 0, egresos: 0 };
+            });
+
+            registrosFinancieros.forEach(r => {
+                const monto = r.monto;
+                if (r.tipo === 'ingreso') totalIng += monto;
+                else {
+                    totalEgr += monto;
+                    const cat = r.categoria || 'Otros';
+                    gastosPorCat[cat] = (gastosPorCat[cat] || 0) + monto;
+                }
+
+                if (r.estado !== 'pendiente') {
+                    const idMes = r.fecha.substring(0, 7);
+                    if (resumenMeses[idMes]) {
+                        if (r.tipo === 'ingreso') resumenMeses[idMes].ingresos += monto;
+                        else resumenMeses[idMes].egresos += monto;
+                    }
+                }
+            });
+
+            const balance = totalIng - totalEgr;
+
+            // Actualizar tarjetas principales
+            document.getElementById('dash-ingresos').innerText = formatearMoneda(totalIng);
+            document.getElementById('dash-egresos').innerText = formatearMoneda(totalEgr);
+            const balEl = document.getElementById('dash-balance');
+            balEl.innerText = formatearMoneda(balance);
+            balEl.style.color = balance >= 0 ? '#0f5132' : '#842029';
+
+            // Renderizar Categorías
+            const catsOrdenadas = Object.entries(gastosPorCat).sort((a,b) => b[1] - a[1]);
+            let htmlCats = '';
+            catsOrdenadas.forEach(([cat, monto]) => {
+                const porcentaje = totalEgr > 0 ? (monto / totalEgr) * 100 : 0;
+                htmlCats += `
+                    <div class="cat-item">
+                        <div class="cat-header">
+                            <span>${cat}</span>
+                            <span>${formatearMoneda(monto)} (${Math.round(porcentaje)}%)</span>
+                        </div>
+                        <div class="cat-bar-bg">
+                            <div class="cat-bar-fill" style="width: ${porcentaje}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+            document.getElementById('dash-categorias').innerHTML = htmlCats || '<p style="color:#777; font-size:0.9rem;">No hay egresos registrados.</p>';
+
+            // Renderizar Resumen Mensual
+            let htmlMeses = '';
+            mesesActivos.forEach(m => {
+                const datosMes = resumenMeses[m.identificador];
+                const balMes = datosMes.ingresos - datosMes.egresos;
+                const colorBal = balMes >= 0 ? '#0f5132' : '#842029';
+                htmlMeses += `
+                    <div class="cat-item" style="border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                        <strong style="display:block; margin-bottom:5px;">${datosMes.nombre}</strong>
+                        <div style="display:flex; justify-content:space-between; font-size:0.85rem;">
+                            <span style="color:#0f5132">Ingresos: ${formatearMoneda(datosMes.ingresos)}</span>
+                            <span style="color:#842029">Egresos: ${formatearMoneda(datosMes.egresos)}</span>
+                            <strong style="color:${colorBal}">Saldo: ${formatearMoneda(balMes)}</strong>
+                        </div>
+                    </div>
+                `;
+            });
+            document.getElementById('dash-meses-resumen').innerHTML = htmlMeses;
         }
 
         function configurarEventosDragAndDrop() {
@@ -460,7 +664,6 @@
             contenedores.forEach(contenedor => {
                 contenedor.addEventListener('dragover', e => {
                     e.preventDefault(); 
-                    // Se envía X e Y para calcular en cuadrículas
                     const elementoPosterior = obtenerElementoPosteriorArrastre(contenedor, e.clientX, e.clientY);
                     const tarjetaArrastrada = document.querySelector('.arrastrando');
                     
@@ -494,13 +697,10 @@
             });
         }
 
-        // Calcula dinámicamente utilizando X e Y para soportar listas y cuadrículas (2D)
         function obtenerElementoPosteriorArrastre(contenedor, x, y) {
             const elementos = [...contenedor.querySelectorAll('.tarjeta:not(.arrastrando)')];
             return elementos.reduce((masCercano, hijo) => {
                 const caja = hijo.getBoundingClientRect();
-                
-                // Determinamos si el mouse está "antes" de la mitad de la tarjeta
                 const cursorAntesDelCentro = (y < caja.top + caja.height / 2) || (y < caja.bottom && x < caja.left + caja.width / 2);
 
                 if (cursorAntesDelCentro) {
@@ -538,7 +738,16 @@
             const registro = registrosFinancieros.find(r => r.id === id);
             if (registro) {
                 registro.pagado = estaPagado;
+                
+                // Actualizar la interfaz inmediatamente para reflejar el gris sin perder el foco/scroll
+                const tarjeta = document.getElementById(id);
+                if (tarjeta) {
+                    if(estaPagado) tarjeta.classList.add('pagada');
+                    else tarjeta.classList.remove('pagada');
+                }
+                
                 sincronizarConPlanilla();
+                renderizarDashboard(); // Por si queremos que el dashboard reaccione a estados futuros
             }
         }
 
@@ -555,8 +764,9 @@
 
         function guardarNuevoRegistro() {
             const nombre = document.getElementById('form-nombre').value;
-            const monto = parseFloat(document.getElementById('form-monto').value);
+            const monto = Math.round(parseFloat(document.getElementById('form-monto').value));
             let fecha = document.getElementById('form-fecha').value;
+            const categoria = document.getElementById('form-categoria').value;
 
             if (!nombre || isNaN(monto) || !fecha) {
                 return alert("Complete Nombre, Monto y Fecha.");
@@ -567,6 +777,7 @@
                 nombre: nombre,
                 monto: monto,
                 tipo: document.getElementById('form-tipo').value,
+                categoria: categoria,
                 fecha: fecha,
                 estado: document.getElementById('form-estado').value,
                 pagado: false
